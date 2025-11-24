@@ -1,5 +1,6 @@
 import { useAttrs, computed, unref, type MaybeRef } from 'vue'
 import { twMerge } from 'tailwind-merge';
+import { isString, isObject, isEmpty, warn } from './utils';
 
 // ============================================
 // Type Definitions
@@ -10,56 +11,8 @@ export interface PtSpec {
 }
 
 // ============================================
-// Utility Functions
+// Theme Processing
 // ============================================
-
-// Type check helpers
-const isString = (value: unknown): value is string => typeof value === 'string';
-
-/**
- * Check if value is a plain object (not Array, Date, etc.)
- * @internal
- */
-const isObject = (value: unknown): value is Record<string, any> => {
-    return value != null
-        && typeof value === 'object'
-        && !Array.isArray(value)
-        && Object.getPrototypeOf(value) === Object.prototype;
-};
-
-/**
- * Check if an object is empty (has no own properties)
- * More performant than Object.keys().length
- * @internal
- */
-function isEmpty(obj: Record<string, any>): boolean {
-    for (const _ in obj) return false;
-    return true;
-}
-
-/**
- * Development mode detection
- * Defaults to true (warnings enabled) in all environments
- * Can be overridden by bundler's tree-shaking in production builds
- * @internal
- */
-const isDev = true;
-
-/**
- * Warning helper (only in development)
- * @internal
- */
-function warn(message: string, details?: Record<string, unknown>): void {
-    if (!isDev) return;
-
-    // Format message with details for better debugging
-    let fullMessage = `[vue-passthrough] ${message}`;
-    if (details && Object.keys(details).length > 0) {
-        fullMessage += '\n' + JSON.stringify(details, null, 2);
-    }
-
-    console.warn(fullMessage);
-}
 
 // Theme processing result cache (using WeakMap to prevent memory leaks)
 const themeCache = new WeakMap<PtSpec, Record<string, Record<string, any>>>();
