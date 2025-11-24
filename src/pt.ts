@@ -14,8 +14,52 @@ export interface PtSpec {
 // ============================================
 
 // Type check helpers
-const isString = (value: any): value is string => typeof value === 'string';
-const isObject = (value: any): value is Record<string, any> => value != null && typeof value === 'object';
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+/**
+ * Check if value is a plain object (not Array, Date, etc.)
+ * @internal
+ */
+const isObject = (value: unknown): value is Record<string, any> => {
+    return value != null
+        && typeof value === 'object'
+        && !Array.isArray(value)
+        && Object.getPrototypeOf(value) === Object.prototype;
+};
+
+/**
+ * Check if an object is empty (has no own properties)
+ * More performant than Object.keys().length
+ * @internal
+ */
+function isEmpty(obj: Record<string, any>): boolean {
+    for (const _ in obj) return false;
+    return true;
+}
+
+/**
+ * Development mode detection
+ * Defaults to true (warnings enabled) in all environments
+ * Can be overridden by bundler's tree-shaking in production builds
+ * @internal
+ */
+const isDev = true;
+
+/**
+ * Warning helper (only in development)
+ * @internal
+ */
+function warn(message: string, details?: Record<string, unknown>): void {
+    if (!isDev) return;
+
+    // Format message with details for better debugging
+    let fullMessage = `[vue-passthrough] ${message}`;
+    if (details && Object.keys(details).length > 0) {
+        fullMessage += '\n' + JSON.stringify(details, null, 2);
+    }
+
+    console.warn(fullMessage);
+}
 
 // Theme processing result cache (using WeakMap to prevent memory leaks)
 const themeCache = new WeakMap<PtSpec, Record<string, Record<string, any>>>();
@@ -74,7 +118,11 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 
         // Detect circular reference
         if (resolving.has(key)) {
-            console.warn(`[PT] Circular reference detected: "${key}" - ignoring extend.`);
+            warn(`Circular reference detected: "${key}" - ignoring extend.`, {
+                key,
+                extend: value.extend,
+                chain: Array.from(resolving)
+            });
             const { extend, ...withoutExtend } = value;
             result[key] = withoutExtend;
             return withoutExtend;
@@ -88,7 +136,7 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 
         // If extend target not found or failed due to circular reference
         if (!baseAttrs) {
-            console.warn(`[PT] Extend target "${extend}" not found: "${key}"`);
+            warn(`Extend target "${extend}" not found: "${key}"`, { key, extend });
             result[key] = { ...rest, class: extendClass || '' };
             resolving.delete(key);
             return result[key];
@@ -123,6 +171,53 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 // ============================================
 
 /**
+ * Merge single key pt attribute (pt:root="class")
+ * @internal Exported for testing purposes
+ */
+function mergeSingleKeyAttr(pt: PtSpec, key: string, value: unknown): void {
+    if (!key) return;
+
+    if (!(key in pt)) {
+        pt[key] = {};
+    }
+
+    const current = pt[key];
+    if (isObject(current)) {
+        const existingClass = current.class;
+        current.class = existingClass
+            ? twMerge(existingClass as string, value as string)
+            : value;
+    } else {
+        pt[key] = { class: value };
+    }
+}
+
+/**
+ * Merge nested pt attribute (pt:root:class="value")
+ * @internal Exported for testing purposes
+ */
+function mergeNestedAttr(pt: PtSpec, keys: string[], value: unknown): void {
+    let current: Record<string, unknown> = pt;
+
+    // Create nested objects up to the last key
+    for (let i = 0; i < keys.length - 1; i++) {
+        const key = keys[i];
+        if (!key) continue;
+
+        if (!(key in current) || !isObject(current[key])) {
+            current[key] = {};
+        }
+        current = current[key] as Record<string, unknown>;
+    }
+
+    // Assign value to the last key
+    const lastKey = keys[keys.length - 1];
+    if (lastKey) {
+        current[lastKey] = value;
+    }
+}
+
+/**
  * Extract pt-related attributes from attrs
  *
  * Supported formats:
@@ -131,15 +226,16 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
  * - pt:root:class="value" → nested attributes (class, id, onClick, etc.)
  */
 export function attrsToPt(): PtSpec {
-    const attrs = useAttrs()
+    const attrs = useAttrs();
     let pt = {} as PtSpec;
+    let objectPt: PtSpec | null = null;
 
     for (const attrKey in attrs) {
-        // Handle :pt="{ ... }" format
+        // Store :pt="{ ... }" format for later merge
         if (attrKey === 'pt') {
             const ptValue = attrs[attrKey];
             if (isObject(ptValue)) {
-                pt = mergePt(pt, ptValue as PtSpec);
+                objectPt = ptValue as PtSpec;
             }
             continue;
         }
@@ -149,47 +245,18 @@ export function attrsToPt(): PtSpec {
 
         const keys = attrKey.slice(3).split(':');
         const value = attrs[attrKey];
-        let current: any = pt;
 
         // pt:root="text" format → { root: { class: "text" } }
         if (keys.length === 1) {
-            const key = keys[0];
-            if (!key) continue;
-
-            if (!(key in current)) {
-                current[key] = {};
-            }
-
-            if (isObject(current[key])) {
-                current[key].class = current[key].class
-                    ? twMerge(current[key].class, value as string)
-                    : value;
-            } else {
-                current[key] = { class: value };
-            }
-            continue;
-        }
-
-        // pt:root:class="text" format → create nested object
-        // Create nested objects up to the last key
-        for (let i = 0; i < keys.length - 1; i++) {
-            const key = keys[i];
-            if (!key) continue;
-
-            if (!(key in current) || !isObject(current[key])) {
-                current[key] = {};
-            }
-            current = current[key];
-        }
-
-        // Assign value to the last key
-        const lastKey = keys[keys.length - 1];
-        if (lastKey) {
-            current[lastKey] = value;
+            mergeSingleKeyAttr(pt, keys[0], value);
+        } else {
+            // pt:root:class="text" format → nested object
+            mergeNestedAttr(pt, keys, value);
         }
     }
 
-    return pt;
+    // Merge :pt object after processing all pt:* attributes
+    return objectPt ? mergePt(pt, objectPt) : pt;
 }
 
 /**
@@ -258,6 +325,37 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
 }
 
 /**
+ * Extract nested PtSpec from a value (only if it doesn't have a class attribute)
+ * @internal Exported for testing purposes
+ */
+function extractNestedPt(value: unknown): PtSpec {
+    if (!value) return {};
+    if (!isObject(value)) return {};
+    if ('class' in value) return {};
+    return value as PtSpec;
+}
+
+/**
+ * Normalize a pt value to HTML attributes
+ * @internal Exported for testing purposes
+ */
+function normalizePtValue(value: unknown): Record<string, any> {
+    if (!value) return {};
+
+    // If string (class shorthand)
+    if (isString(value)) {
+        return { class: value };
+    }
+
+    // If object
+    if (isObject(value)) {
+        return value as Record<string, any>;
+    }
+
+    return {};
+}
+
+/**
  * Merge theme's base attributes with pt to return final HTML attributes
  *
  * @param key - Element key (e.g., 'root', 'input', 'helper')
@@ -281,28 +379,18 @@ function ptAttrs(
     // Return only base attributes if key not in pt
     if (!ptValue) return baseAttrs;
 
-    // Separate class from baseAttrs (to prevent duplication)
+    // Normalize pt value to HTML attributes
+    const normalized = normalizePtValue(ptValue);
+
+    // Separate class from both objects for special merging
     const { class: baseClass, ...baseRest } = baseAttrs;
+    const { class: ptClass, ...ptRest } = normalized;
 
-    // If string (class shorthand)
-    if (isString(ptValue)) {
-        return {
-            ...baseRest,
-            class: twMerge(baseClass || '', ptValue)
-        };
-    }
-
-    // If object
-    if (isObject(ptValue)) {
-        const { class: ptClass, ...ptRest } = ptValue;
-        return {
-            ...baseRest,
-            ...ptRest,  // Merge other pt attributes (id, onClick, etc.)
-            class: twMerge(baseClass || '', ptClass || '')  // Merge class with twMerge
-        };
-    }
-
-    return baseAttrs;
+    return {
+        ...baseRest,
+        ...ptRest,  // Merge other pt attributes (id, onClick, etc.)
+        class: twMerge(baseClass || '', ptClass || '')  // Merge class with twMerge
+    };
 }
 
 // ============================================
@@ -312,23 +400,103 @@ function ptAttrs(
 /**
  * PassThrough system: Component style customization
  *
- * Merge styles from 3 sources:
- * 1. theme (component default styles)
- * 2. attrs (passed from parent as pt:root="..." format)
- * 3. propsPt (passed from parent as :pt="{ root: '...' }" format)
+ * @description
+ * The PassThrough system allows deep customization of component styles by merging
+ * styles from three sources with intelligent replace vs merge strategies.
  *
- * Merge priority: theme < attrs < propsPt
+ * **Merge Sources:**
+ * 1. `theme` - Component default styles (lowest priority)
+ * 2. `attrs` - Passed from parent as `pt:root="..."` format (middle priority)
+ * 3. `propsPt` - Passed from parent as `:pt="{ root: '...' }"` format (highest priority)
  *
- * @param theme - Default theme (flat structure, strings automatically converted to class)
- * @param propsPt - props.pt (optional, MaybeRef for automatic reactivity handling)
+ * **Replace vs Merge Strategy:**
+ * - **Replace (props.pt)**: When a key exists in `props.pt`, it completely replaces
+ *   the theme for that key. Use for complete style overrides.
+ * - **Merge (attrs)**: When using `pt:*` attributes, they merge additively with the
+ *   theme. Use for extending existing styles.
  *
- * @example
+ * @param theme - Default theme configuration (flat structure)
+ *   - Strings are automatically converted to `{ class: "..." }`
+ *   - Supports `extend` attribute for style inheritance
+ *   - Processed once and cached for performance
+ * @param propsPt - Optional pt from props (MaybeRef for full reactivity)
+ *   - Supports Vue refs and computed values
+ *   - Changes trigger automatic re-rendering
+ *
+ * @returns Object containing:
+ *   - `pt(key)` - Function to get HTML attributes for v-bind
+ *   - `ptFor(key)` - Function to extract nested pt for child components
+ *   - `debugPt` - Computed ref with final merged pt spec (for debugging)
+ *
+ * @example Basic usage
+ * ```vue
+ * <script setup lang="ts">
+ * import { usePassThrough, type PtSpec } from 'vue-passthrough'
+ *
+ * const props = defineProps<{ pt?: PtSpec }>()
+ *
  * const { pt } = usePassThrough({
  *   root: "grid gap-2",
- *   input: "border px-3",
- *   inputInvalid: { extend: 'input', class: "border-red-500" },
- *   helper: "text-xs"
- * }, props.pt)
+ *   input: "border px-3"
+ * }, computed(() => props.pt))
+ * </script>
+ *
+ * <template>
+ *   <div v-bind="pt('root')">
+ *     <input v-bind="pt('input')" />
+ *   </div>
+ * </template>
+ * ```
+ *
+ * @example Replace strategy (props.pt)
+ * ```vue
+ * <!-- Theme: { root: "grid gap-2" } -->
+ * <MyComponent :pt="{ root: 'flex flex-row' }" />
+ * <!-- Result: class="flex flex-row" (theme completely ignored) -->
+ * ```
+ *
+ * @example Merge strategy (attrs)
+ * ```vue
+ * <!-- Theme: { root: "grid gap-2" } -->
+ * <MyComponent pt:root="p-4 bg-white" />
+ * <!-- Result: class="grid gap-2 p-4 bg-white" (additive merge) -->
+ * ```
+ *
+ * @example Extend pattern
+ * ```vue
+ * <script setup>
+ * const { pt } = usePassThrough({
+ *   input: "w-full border px-3 py-2",
+ *   inputInvalid: {
+ *     extend: 'input',
+ *     class: "border-red-500"
+ *   }
+ * })
+ * </script>
+ * <!-- inputInvalid inherits from input and adds red border -->
+ * ```
+ *
+ * @example Nested components (ptFor)
+ * ```vue
+ * <script setup>
+ * const { pt, ptFor } = usePassThrough({
+ *   root: "flex gap-2",
+ *   badge: {
+ *     root: "px-2 py-1",
+ *     label: "text-xs"
+ *   }
+ * })
+ * </script>
+ *
+ * <template>
+ *   <div v-bind="pt('root')">
+ *     <Badge :pt="ptFor('badge')" />
+ *   </div>
+ * </template>
+ * ```
+ *
+ * @see {@link https://github.com/fxpoet/vue-passthrough#usage | Usage Guide}
+ * @see {@link https://github.com/fxpoet/vue-passthrough#api | API Reference}
  */
 export function usePassThrough(
     theme: PtSpec,
@@ -372,19 +540,7 @@ export function usePassThrough(
 
         // If key exists in propsPt, ignore theme (REPLACE)
         if (key in propsValue) {
-            const ptValue = propsValue[key];
-
-            // If string (class shorthand)
-            if (isString(ptValue)) {
-                return { class: ptValue };
-            }
-
-            // If object
-            if (isObject(ptValue)) {
-                return ptValue as Record<string, any>;
-            }
-
-            return {};
+            return normalizePtValue(propsValue[key]);
         }
 
         // If key doesn't exist in propsPt, merge theme + attrsPt (MERGE)
@@ -405,33 +561,22 @@ export function usePassThrough(
     const ptFor = (componentKey: string): PtSpec => {
         const propsValue = resolvedPropsPt.value;
 
-        // Helper to extract nested PtSpec (treat as nested object if no class)
-        const getNestedPt = (val: any): PtSpec => {
-            if (!val) return {};
-            if (isObject(val) && !('class' in val)) {
-                return val as PtSpec;
-            }
-            return {};
-        };
-
         // If key exists in propsPt, ignore theme (REPLACE)
         if (componentKey in propsValue) {
-            return getNestedPt(propsValue[componentKey]);
+            return extractNestedPt(propsValue[componentKey]);
         }
 
         // If key doesn't exist in propsPt, use theme + attrs
-        // attrs are already reflected in debugPt
         const attrsValue = attrsPt.value[componentKey];
         if (attrsValue) {
-            const nested = getNestedPt(attrsValue);
-            if (Object.keys(nested).length > 0) {
+            const nested = extractNestedPt(attrsValue);
+            if (!isEmpty(nested)) {
                 return nested;
             }
         }
 
         // If not in attrs either, use theme
-        const themeValue = normalizedTheme[componentKey];
-        return getNestedPt(themeValue);
+        return extractNestedPt(normalizedTheme[componentKey]);
     };
 
     return {
@@ -456,3 +601,45 @@ export function usePassThrough(
 
 // Alias (for shorter usage)
 export const usePt = usePassThrough;
+
+// ============================================
+// Internal utilities (exported for testing)
+// ============================================
+
+/**
+ * Internal utilities exposed for testing purposes.
+ * These are not part of the public API and may change without notice.
+ *
+ * @internal
+ * @example
+ * ```ts
+ * import { _internal } from 'vue-passthrough'
+ *
+ * // Testing type guards
+ * expect(_internal.isString('test')).toBe(true)
+ * expect(_internal.isObject([])).toBe(false) // Arrays are not plain objects
+ *
+ * // Testing normalization
+ * const result = _internal.normalizePtValue('text-red-500')
+ * expect(result).toEqual({ class: 'text-red-500' })
+ * ```
+ */
+export const _internal = {
+    // Core processing
+    processTheme,
+
+    // Utility functions
+    extractNestedPt,
+    normalizePtValue,
+    mergeSingleKeyAttr,
+    mergeNestedAttr,
+    ptAttrs,
+
+    // Type guards
+    isString,
+    isObject,
+    isEmpty,
+
+    // Development helpers
+    warn
+} as const;
