@@ -1,11 +1,14 @@
 import { useAttrs, computed, unref, type MaybeRef } from 'vue'
 import { twMerge } from 'tailwind-merge';
-import { isString, isObject, isEmpty, warn } from './utils';
-
+import { isString, isObject, isEmpty, warn, toClassObject, normalizeValue } from './utils';
 
 export interface PtSpec {
     [key: string]: string | Record<string, any> | PtSpec | undefined;
 }
+
+// ============================================
+// Theme Processing
+// ============================================
 
 // Theme processing result cache (using WeakMap to prevent memory leaks)
 const themeCache = new WeakMap<PtSpec, Record<string, Record<string, any>>>();
@@ -36,11 +39,9 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 
     for (const key in theme) {
         const value = theme[key];
-
-        if (isString(value)) {
-            normalized[key] = { class: value };
-        } else if (isObject(value)) {
-            normalized[key] = value;
+        const normalized_value = normalizeValue(value);
+        if (!isEmpty(normalized_value)) {
+            normalized[key] = normalized_value;
         }
     }
 
@@ -137,7 +138,7 @@ function mergeSingleKeyAttr(pt: PtSpec, key: string, value: unknown): void {
             ? twMerge(existingClass as string, value as string)
             : value;
     } else {
-        pt[key] = { class: value };
+        pt[key] = toClassObject(value as string);
     }
 }
 
@@ -241,8 +242,8 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
         }
 
         // Treat strings as class shorthand → convert to object and merge
-        const normalized1 = isString(val1) ? { class: val1 } : val1;
-        const normalized2 = isString(val2) ? { class: val2 } : val2;
+        const normalized1 = isString(val1) ? toClassObject(val1) : val1;
+        const normalized2 = isString(val2) ? toClassObject(val2) : val2;
 
         // If both are objects
         if (isObject(normalized1) && isObject(normalized2)) {
@@ -285,26 +286,6 @@ function extractNestedPt(value: unknown): PtSpec {
 }
 
 /**
- * Normalize a pt value to HTML attributes
- * @internal Exported for testing purposes
- */
-function normalizePtValue(value: unknown): Record<string, any> {
-    if (!value) return {};
-
-    // If string (class shorthand)
-    if (isString(value)) {
-        return { class: value };
-    }
-
-    // If object
-    if (isObject(value)) {
-        return value as Record<string, any>;
-    }
-
-    return {};
-}
-
-/**
  * Merge theme's base attributes with pt to return final HTML attributes
  *
  * @param key - Element key (e.g., 'root', 'input', 'helper')
@@ -329,7 +310,7 @@ function ptAttrs(
     if (!ptValue) return baseAttrs;
 
     // Normalize pt value to HTML attributes
-    const normalized = normalizePtValue(ptValue);
+    const normalized = normalizeValue(ptValue);
 
     // Separate class from both objects for special merging
     const { class: baseClass, ...baseRest } = baseAttrs;
@@ -422,7 +403,7 @@ export function usePassThrough(
 
         // If key exists in propsPt, ignore theme (REPLACE)
         if (key in propsValue) {
-            return normalizePtValue(propsValue[key]);
+            return normalizeValue(propsValue[key]);
         }
 
         // If key doesn't exist in propsPt, merge theme + attrsPt (MERGE)
@@ -600,7 +581,6 @@ export function useTypedPassThrough<T extends PtSpec>(
 export const _internal = {
     processTheme,
     extractNestedPt,
-    normalizePtValue,
     mergeSingleKeyAttr,
     mergeNestedAttr,
     ptAttrs

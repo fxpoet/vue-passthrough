@@ -70,6 +70,60 @@ export function isEmpty(obj: Record<string, any>): boolean {
 }
 
 /**
+ * Convert a string value to a class object
+ *
+ * This helper reduces code duplication for the common pattern of
+ * converting string values to `{ class: "..." }` objects.
+ *
+ * @param value - String value to convert
+ * @returns Object with class property
+ *
+ * @example
+ * ```ts
+ * toClassObject('text-red-500')  // { class: 'text-red-500' }
+ * toClassObject('grid gap-2')    // { class: 'grid gap-2' }
+ * toClassObject('')              // { class: '' }
+ * ```
+ */
+export function toClassObject(value: string): { class: string } {
+    return { class: value };
+}
+
+/**
+ * Normalize any value to a plain object
+ *
+ * This function handles the conversion of various value types to a
+ * consistent object format used throughout the passthrough system.
+ *
+ * @param value - Value to normalize
+ * @returns Normalized object
+ *
+ * @example
+ * ```ts
+ * // String → class object
+ * normalizeValue('text-red-500')  // { class: 'text-red-500' }
+ *
+ * // Object → return as-is
+ * normalizeValue({ class: 'border', id: 'foo' })  // { class: 'border', id: 'foo' }
+ *
+ * // Other values → empty object
+ * normalizeValue(null)       // {}
+ * normalizeValue(undefined)  // {}
+ * normalizeValue(123)        // {}
+ * normalizeValue([])         // {}
+ * ```
+ */
+export function normalizeValue(value: unknown): Record<string, any> {
+    if (isString(value)) {
+        return toClassObject(value);
+    }
+    if (isObject(value)) {
+        return value as Record<string, any>;
+    }
+    return {};
+}
+
+/**
  * Development mode detection
  *
  * Defaults to `true` (warnings enabled) in all environments.

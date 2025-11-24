@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { isString, isObject, isEmpty, warn } from '../src/utils'
+import { isString, isObject, isEmpty, warn, toClassObject, normalizeValue } from '../src/utils'
 
 describe('Utility Functions', () => {
     // ============================================
@@ -141,6 +141,128 @@ describe('Utility Functions', () => {
 
         it('returns false for objects with zero values', () => {
             expect(isEmpty({ a: 0 })).toBe(false)
+        })
+    })
+
+    // ============================================
+    // toClassObject tests
+    // ============================================
+    describe('toClassObject', () => {
+        it('converts string to class object', () => {
+            const result = toClassObject('text-red-500')
+            expect(result).toEqual({ class: 'text-red-500' })
+        })
+
+        it('handles multiple class names', () => {
+            const result = toClassObject('grid gap-2 p-4')
+            expect(result).toEqual({ class: 'grid gap-2 p-4' })
+        })
+
+        it('handles empty string', () => {
+            const result = toClassObject('')
+            expect(result).toEqual({ class: '' })
+        })
+
+        it('preserves whitespace', () => {
+            const result = toClassObject('  text-sm  ')
+            expect(result).toEqual({ class: '  text-sm  ' })
+        })
+
+        it('returns object with only class property', () => {
+            const result = toClassObject('border')
+            expect(Object.keys(result)).toEqual(['class'])
+        })
+    })
+
+    // ============================================
+    // normalizeValue tests
+    // ============================================
+    describe('normalizeValue', () => {
+        it('converts string to class object', () => {
+            const result = normalizeValue('text-red-500')
+            expect(result).toEqual({ class: 'text-red-500' })
+        })
+
+        it('returns object as-is', () => {
+            const input = { class: 'border', id: 'foo' }
+            const result = normalizeValue(input)
+            expect(result).toBe(input)
+            expect(result).toEqual({ class: 'border', id: 'foo' })
+        })
+
+        it('returns empty object for null', () => {
+            const result = normalizeValue(null)
+            expect(result).toEqual({})
+        })
+
+        it('returns empty object for undefined', () => {
+            const result = normalizeValue(undefined)
+            expect(result).toEqual({})
+        })
+
+        it('returns empty object for numbers', () => {
+            expect(normalizeValue(123)).toEqual({})
+            expect(normalizeValue(0)).toEqual({})
+            expect(normalizeValue(NaN)).toEqual({})
+        })
+
+        it('returns empty object for booleans', () => {
+            expect(normalizeValue(true)).toEqual({})
+            expect(normalizeValue(false)).toEqual({})
+        })
+
+        it('returns empty object for arrays', () => {
+            expect(normalizeValue([])).toEqual({})
+            expect(normalizeValue([1, 2, 3])).toEqual({})
+        })
+
+        it('returns empty object for Date objects', () => {
+            expect(normalizeValue(new Date())).toEqual({})
+        })
+
+        it('returns empty object for Map objects', () => {
+            expect(normalizeValue(new Map())).toEqual({})
+        })
+
+        it('returns empty object for Set objects', () => {
+            expect(normalizeValue(new Set())).toEqual({})
+        })
+
+        it('returns empty object for functions', () => {
+            expect(normalizeValue(() => {})).toEqual({})
+            expect(normalizeValue(function() {})).toEqual({})
+        })
+
+        it('handles empty string', () => {
+            const result = normalizeValue('')
+            expect(result).toEqual({ class: '' })
+        })
+
+        it('handles complex nested objects', () => {
+            const input = {
+                class: 'border',
+                id: 'test',
+                onClick: () => {},
+                style: { color: 'red' }
+            }
+            const result = normalizeValue(input)
+            expect(result).toBe(input)
+            expect(result).toHaveProperty('class')
+            expect(result).toHaveProperty('id')
+            expect(result).toHaveProperty('onClick')
+            expect(result).toHaveProperty('style')
+        })
+
+        it('handles objects without class property', () => {
+            const input = { id: 'foo', onClick: () => {} }
+            const result = normalizeValue(input)
+            expect(result).toBe(input)
+            expect(result).toEqual({ id: 'foo', onClick: expect.any(Function) })
+        })
+
+        it('returns empty object for custom class instances', () => {
+            class CustomClass {}
+            expect(normalizeValue(new CustomClass())).toEqual({})
         })
     })
 
