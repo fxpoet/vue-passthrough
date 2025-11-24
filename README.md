@@ -10,7 +10,8 @@ A Vue composable that allows you to inject styles and attributes directly into a
 
 - **Flexible Style Customization**: Inject classes and HTML attributes into any component element from the outside
 - **Tailwind CSS Optimized**: Automatic class conflict resolution using `tailwind-merge`
-- **Full Reactivity**: Seamlessly integrated with Vue's reactivity system
+- **Full Reactivity**: Seamlessly integrated with Vue's reactivity system (supports ref/computed)
+- **TypeScript Support**: Full type safety with generic `usePassThrough<T>`, `defineTheme`, and autocomplete
 - **Extend Pattern**: Style inheritance to reduce duplication
 - **3-Tier Merging**: Automatic merging with priority: props.pt > attrs > theme
 
@@ -369,23 +370,94 @@ Usage:
 
 ## API Reference
 
-### usePassThrough(theme, propsPt?)
+### usePassThrough<T>(theme, propsPt?)
 
-Main composable function for the PassThrough system.
+Main composable function for the PassThrough system with full TypeScript support.
 
 **Parameters:**
 
-- `theme: PtSpec` - Default theme definition (required)
-- `propsPt?: MaybeRef<PtSpec>` - props.pt (optional, automatically handles ref/computed)
+- `theme: T extends PtSpec` - Default theme definition (use with `defineTheme` for best type inference)
+- `propsPt?: MaybeRef<PtSpec | undefined>` - props.pt (optional, automatically handles ref/computed)
 
 **Returns:**
 
 ```typescript
 {
-  pt: (key: string) => Record<string, any>,
-  ptFor: (componentKey: string) => PtSpec,
+  pt: (key: ThemeKeys<T>) => Record<string, any>,  // Type-safe keys with autocomplete
+  ptFor: (key: ThemeKeys<T>) => PtSpec,            // Type-safe keys with autocomplete
   debugPt: ComputedRef<PtSpec>
 }
+```
+
+**Basic Usage (without types):**
+
+```vue
+<script setup lang="ts">
+import { usePassThrough } from 'vue-passthrough'
+
+const { pt } = usePassThrough({
+  root: 'grid gap-2',
+  input: 'border px-3'
+}, props.pt)
+</script>
+```
+
+**Type-Safe Usage (with defineTheme):**
+
+```vue
+<script setup lang="ts">
+import { usePassThrough, defineTheme, PtSpec } from 'vue-passthrough'
+
+// defineTheme preserves type information for autocomplete
+const theme = defineTheme({
+  root: 'grid gap-2',
+  input: 'border px-3',
+  helper: 'text-xs'
+})
+
+const props = defineProps<{ pt?: PtSpec }>()
+
+// TypeScript infers theme keys automatically
+const { pt } = usePassThrough(theme, props.pt)
+</script>
+
+<template>
+  <div v-bind="pt('root')">
+    <input v-bind="pt('input')" />
+    <!-- pt('root'), pt('input'), pt('helper') have autocomplete ✅ -->
+    <!-- pt('invalid') will show TypeScript error ❌ -->
+  </div>
+</template>
+```
+
+### defineTheme(theme)
+
+Helper function to define a strongly-typed theme with preserved type information for better autocomplete and type checking.
+
+**Parameters:**
+
+- `theme: T extends PtSpec` - Theme configuration object
+
+**Returns:** The same theme object with preserved type information
+
+**Example:**
+
+```typescript
+const myTheme = defineTheme({
+  root: 'grid gap-2',
+  input: 'border px-3',
+  inputError: {
+    extend: 'input',
+    class: 'border-red-500'
+  },
+  badge: {
+    root: 'px-2 py-1 rounded',
+    label: 'text-xs font-medium'
+  }
+})
+
+const { pt, ptFor } = usePassThrough(myTheme, props.pt)
+// Now you get autocomplete for all theme keys!
 ```
 
 ### PtSpec Type
@@ -400,25 +472,22 @@ interface PtSpec {
 }
 ```
 
-## Reactivity
+### ThemeKeys<T> Type
 
-All pt sources support full reactivity.
+Type helper to extract theme keys for type-safe operations.
 
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
+```typescript
+const theme = defineTheme({
+  root: 'grid',
+  input: 'border',
+  helper: 'text-xs'
+})
 
-const customPt = ref({ root: 'bg-red-500' })
+type MyThemeKeys = ThemeKeys<typeof theme> // 'root' | 'input' | 'helper'
 
-const { pt } = usePassThrough({
-  root: 'grid'
-}, customPt)
-
-// Reactive update
-setTimeout(() => {
-  customPt.value = { root: 'bg-blue-500' }  // UI updates automatically
-}, 1000)
-</script>
+function customFunction(key: MyThemeKeys) {
+  // key is now type-safe
+}
 ```
 
 ## Requirements

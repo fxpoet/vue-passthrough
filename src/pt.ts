@@ -344,20 +344,33 @@ function ptAttrs(
  *   - Strings are automatically converted to `{ class: "..." }`
  *   - Supports `extend` attribute for style inheritance
  *   - Processed once and cached for performance
+ *   - Use with `defineTheme()` for type-safe keys and autocomplete
  * @param propsPt - Optional pt from props (MaybeRef for full reactivity)
  *   - Supports Vue refs and computed values
  *   - Changes trigger automatic re-rendering
  *
  * @returns Object containing:
- *   - `pt(key)` - Function to get HTML attributes for v-bind
- *   - `ptFor(key)` - Function to extract nested pt for child components
+ *   - `pt(key)` - Function to get HTML attributes for v-bind (type-safe when using defineTheme)
+ *   - `ptFor(key)` - Function to extract nested pt for child components (type-safe when using defineTheme)
  *   - `debugPt` - Computed ref with final merged pt spec (for debugging)
+ *
+ * @example
+ * ```ts
+ * // Type-safe usage with defineTheme
+ * const theme = defineTheme({
+ *   root: 'grid gap-2',
+ *   input: 'border px-3'
+ * })
+ * const { pt } = usePassThrough(theme, props.pt)
+ * pt('root')   // ✅ Autocomplete
+ * pt('invalid') // ❌ TypeScript error
+ * ```
  *
  * @see {@link https://github.com/fxpoet/vue-passthrough#usage | Usage Guide}
  * @see {@link https://github.com/fxpoet/vue-passthrough#api | API Reference}
  */
-export function usePassThrough(
-    theme: PtSpec,
+export function usePassThrough<T extends PtSpec = PtSpec>(
+    theme: T,
     propsPt?: MaybeRef<PtSpec | undefined>
 ) {
     // 1. Extract pt from attrs (maintain reactivity with computed)
@@ -393,7 +406,7 @@ export function usePassThrough(
      * - If key exists in propsPt: ignore theme and use only propsPt (REPLACE)
      * - If key doesn't exist in propsPt: merge theme + attrsPt (MERGE)
      */
-    const pt = (key: string): Record<string, any> => {
+    const pt = (key: ThemeKeys<T>): Record<string, any> => {
         const propsValue = resolvedPropsPt.value;
 
         // If key exists in propsPt, ignore theme (REPLACE)
@@ -416,7 +429,7 @@ export function usePassThrough(
      * // In Button component
      * <Badge :pt="ptFor('badge')" />
      */
-    const ptFor = (componentKey: string): PtSpec => {
+    const ptFor = (componentKey: ThemeKeys<T>): PtSpec => {
         const propsValue = resolvedPropsPt.value;
 
         // If key exists in propsPt, ignore theme (REPLACE)
@@ -526,50 +539,6 @@ export function defineTheme<T extends PtSpec>(theme: T): T {
  */
 export type ThemeKeys<T extends PtSpec> = keyof T & string;
 
-/**
- * Create a typed pt function with better autocomplete
- *
- * This is an alternative to usePassThrough that provides stronger typing
- * for the pt() function keys when you have a statically defined theme.
- *
- * @param theme - Theme configuration (use defineTheme for best results)
- * @param propsPt - Optional pt from props
- * @returns Object with typed pt, ptFor, and debugPt
- *
- * @example
- * ```ts
- * const theme = defineTheme({
- *   root: 'grid gap-2',
- *   input: 'border px-3'
- * })
- *
- * const props = defineProps<{ pt?: PtSpec }>()
- *
- * // pt() now has autocomplete for 'root' | 'input'
- * const { pt } = useTypedPassThrough(theme, computed(() => props.pt))
- * ```
- */
-export function useTypedPassThrough<T extends PtSpec>(
-    theme: T,
-    propsPt?: MaybeRef<PtSpec | undefined>
-) {
-    const base = usePassThrough(theme, propsPt);
-
-    return {
-        ...base,
-        /**
-         * Get HTML attributes with type-safe key parameter
-         * @param key - Theme key (autocomplete enabled)
-         */
-        pt: (key: ThemeKeys<T>): Record<string, any> => base.pt(key),
-
-        /**
-         * Extract nested pt for child components with type-safe key
-         * @param key - Theme key (autocomplete enabled)
-         */
-        ptFor: (key: ThemeKeys<T>): PtSpec => base.ptFor(key)
-    };
-}
 
 
 // Internal utilities (exported for testing)
