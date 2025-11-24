@@ -4,7 +4,7 @@ A Vue composable for styling nested elements inside Vue components from parent l
 
 A Vue composable that allows you to inject styles and attributes directly into any nested element within a component, no matter how deep. Makes your components highly reusable and customizable with Tailwind CSS support.
 
-> Inspired by [PrimeVue's PassThrough API](https://primevue.org/passthrough/)
+> Inspired by [PrimeVue's PassThrough API](https://primevue.org/passthrough/) - See [what's different](#whats-different-from-primevues-passthrough)
 
 > **For LLMs/AI Tools:** See [LLM.txt](https://raw.githubusercontent.com/fxpoet/vue-passthrough/refs/heads/master/LLM.txt) for a concise API reference optimized for AI assistance.
 
@@ -369,6 +369,25 @@ Usage:
   New Message
 </Button>
 ```
+
+## What's Different from PrimeVue's PassThrough?
+
+While inspired by PrimeVue, this library offers key improvements for building custom components:
+
+- **Per-Key Replace (not Whole Object)**: In PrimeVue, `:pt="{ root: '...' }"` replaces the **entire** pt object. In vue-passthrough, only the specified keys are replaced - other keys keep their theme defaults.
+  ```vue
+  <!-- theme: { root: 'grid', input: 'border', helper: 'text-xs' } -->
+
+  <!-- PrimeVue: root, input, helper ALL gone -->
+  <InputSwitch :pt="{ root: 'flex' }" />
+
+  <!-- vue-passthrough: only root replaced, input & helper keep theme -->
+  <MyInput :pt="{ root: 'flex' }" />
+  <!-- → root: 'flex', input: 'border', helper: 'text-xs' -->
+  ```
+- **Built-in Tailwind Support**: Automatic class conflict resolution with `tailwind-merge` - no manual handling needed.
+- **Event Handler Chaining**: Uses Vue's `mergeProps` to chain event handlers instead of replacing them.
+- **Extend Pattern**: Built-in style inheritance to reuse common patterns (e.g., `inputError` extends `input`).
 
 ## API Reference
 
