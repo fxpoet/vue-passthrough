@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "dev": "vite --config vite.config.playground.ts",
-    "build": "vite build && tsc --emitDeclarationOnly --outDir dist",
+    "build": "vite build && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "release": "bumpp && npm publish"
