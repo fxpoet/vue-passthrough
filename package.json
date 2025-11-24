@@ -40,7 +40,7 @@
   "author": "Kiyoung Jung <im@fxpoet.com>",
   "license": "MIT",
   "peerDependencies": {
-    "tailwind-merge": "^3.0.0",
+    "tailwind-merge": "^2.6.0 || ^3.0.0",
     "vue": "^3.2.0"
   },
   "devDependencies": {
