@@ -24,8 +24,7 @@
     "build": "vite build && tsc --emitDeclarationOnly --outDir dist",
     "test": "vitest run",
     "test:watch": "vitest",
-    "release": "bumpp",
-    "prepublishOnly": "npm run build && npm test"
+    "release": "bumpp && npm publish"
   },
   "keywords": [
     "vue",
