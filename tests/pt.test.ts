@@ -1,10 +1,262 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ref, nextTick, defineComponent, computed } from 'vue'
 import { mount } from '@vue/test-utils'
-import { mergePt, usePassThrough } from '../src/pt'
+import { mergePt, usePassThrough, attrsToPt } from '../src/pt'
 import type { PtSpec } from '../src/pt'
 
 describe('PassThrough System', () => {
+    // ============================================
+    // attrsToPt tests (attrs extraction and parsing)
+    // ============================================
+    describe('attrsToPt', () => {
+        it('returns empty object when no pt attrs present', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result).toEqual({})
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'class': 'some-class',
+                    'id': 'test-id'
+                }
+            })
+        })
+
+        it('parses single key pt attribute (pt:root="class")', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toEqual({ class: 'bg-red-500' })
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root': 'bg-red-500'
+                }
+            })
+        })
+
+        it('parses multiple single key pt attributes', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toEqual({ class: 'grid gap-2' })
+                    expect(result.input).toEqual({ class: 'border' })
+                    expect(result.helper).toEqual({ class: 'text-xs' })
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root': 'grid gap-2',
+                    'pt:input': 'border',
+                    'pt:helper': 'text-xs'
+                }
+            })
+        })
+
+        it('parses nested pt attributes (pt:root:id="value")', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toEqual({
+                        id: 'custom-id',
+                        'data-test': 'test-value'
+                    })
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root:id': 'custom-id',
+                    'pt:root:data-test': 'test-value'
+                }
+            })
+        })
+
+        it('merges single key and nested attributes for same key', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toHaveProperty('class')
+                    expect(result.root).toHaveProperty('id')
+                    expect((result.root as any).class).toContain('bg-blue-500')
+                    expect((result.root as any).id).toBe('test-id')
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root': 'bg-blue-500',
+                    'pt:root:id': 'test-id'
+                }
+            })
+        })
+
+        it('handles multiple class values in single pt attribute', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toHaveProperty('class')
+                    // Multiple classes in single attribute
+                    const className = (result.root as any).class
+                    expect(className).toContain('bg-red-500')
+                    expect(className).toContain('p-4')
+                    expect(className).toContain('text-white')
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root': 'bg-red-500 p-4 text-white'
+                }
+            })
+        })
+
+        it('parses object-style :pt attribute', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toBeDefined()
+                    expect(result.input).toBeDefined()
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    pt: {
+                        root: 'grid gap-2',
+                        input: { class: 'border', id: 'input-id' }
+                    }
+                }
+            })
+        })
+
+        it('merges :pt object with pt:* attributes (pt:* has priority)', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    // pt:root should merge with :pt root
+                    expect(result.root).toHaveProperty('class')
+                    const className = (result.root as any).class
+                    expect(className).toContain('grid')
+                    expect(className).toContain('bg-red-500')
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    pt: {
+                        root: 'grid gap-2',
+                        helper: 'text-xs'
+                    },
+                    'pt:root': 'bg-red-500'
+                }
+            })
+        })
+
+        it('ignores non-object :pt values', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result).toEqual({ helper: { class: 'text-xs' } })
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    pt: 'invalid-string-value',
+                    'pt:helper': 'text-xs'
+                }
+            })
+        })
+
+        it('handles empty string values', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toEqual({ class: '' })
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root': ''
+                }
+            })
+        })
+
+        it('handles deeply nested attributes (pt:root:style:color)', () => {
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toBeDefined()
+                    expect((result.root as any).style).toBeDefined()
+                    expect((result.root as any).style.color).toBe('red')
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root:style:color': 'red'
+                }
+            })
+        })
+
+        it('handles event handlers in pt attributes', () => {
+            const onClick = vi.fn()
+
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toHaveProperty('onClick')
+                    expect(typeof (result.root as any).onClick).toBe('function')
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root:onClick': onClick
+                }
+            })
+        })
+
+        it('preserves complex object values', () => {
+            const complexValue = { nested: { deep: 'value' } }
+
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const result = attrsToPt()
+                    expect(result.root).toHaveProperty('data')
+                    expect((result.root as any).data).toEqual(complexValue)
+                }
+            })
+
+            mount(TestComponent, {
+                attrs: {
+                    'pt:root:data': complexValue
+                }
+            })
+        })
+    })
+
     // ============================================
     // mergePt tests (pure function tests)
     // ============================================
