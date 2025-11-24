@@ -2,7 +2,7 @@ import { useAttrs, computed, unref, type MaybeRef } from 'vue'
 import { twMerge } from 'tailwind-merge';
 
 // ============================================
-// 타입 정의
+// Type Definitions
 // ============================================
 
 export interface PtSpec {
@@ -10,22 +10,22 @@ export interface PtSpec {
 }
 
 // ============================================
-// 유틸리티 함수
+// Utility Functions
 // ============================================
 
-// 타입 체크 헬퍼
+// Type check helpers
 const isString = (value: any): value is string => typeof value === 'string';
 const isObject = (value: any): value is Record<string, any> => value != null && typeof value === 'object';
 
-// Theme 처리 결과 캐시 (메모리 누수 방지를 위해 WeakMap 사용)
+// Theme processing result cache (using WeakMap to prevent memory leaks)
 const themeCache = new WeakMap<PtSpec, Record<string, Record<string, any>>>();
 
 /**
- * Theme 처리: 정규화 + extend 해결을 한 번에 수행
+ * Theme processing: Normalization + extend resolution in one step
  *
- * 1. 문자열 → { class: "..." } 변환
- * 2. extend 속성 처리 (순환 참조 감지)
- * 3. 결과 캐싱 (동일한 theme 객체에 대해 중복 처리 방지)
+ * 1. Convert strings → { class: "..." }
+ * 2. Process extend attributes (detect circular references)
+ * 3. Cache results (prevent duplicate processing for the same theme object)
  *
  * @example
  * processTheme({
@@ -35,10 +35,10 @@ const themeCache = new WeakMap<PtSpec, Record<string, Record<string, any>>>();
  * })
  */
 function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
-    // 캐시 확인 (성능 최적화)
+    // Check cache (performance optimization)
     const cached = themeCache.get(theme);
     if (cached) return cached;
-    // 1단계: 정규화 (문자열 → 객체)
+    // Step 1: Normalization (string → object)
     const normalized: Record<string, Record<string, any>> = {};
 
     for (const key in theme) {
@@ -51,28 +51,28 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
         }
     }
 
-    // 2단계: extend 해결 (순환 참조 감지)
+    // Step 2: Resolve extend (detect circular references)
     const result: Record<string, Record<string, any>> = {};
-    const resolving = new Set<string>();  // 현재 해결 중인 키 추적
+    const resolving = new Set<string>();  // Track keys currently being resolved
 
     /**
-     * extend를 재귀적으로 해결하는 헬퍼 함수
-     * @returns 해결된 속성 또는 null (순환 참조 시)
+     * Helper function to recursively resolve extend
+     * @returns Resolved attributes or null (if circular reference)
      */
     const resolveExtend = (key: string): Record<string, any> | null => {
-        // 이미 해결된 경우
+        // Already resolved
         if (key in result) return result[key] || null;
 
         const value = normalized[key];
         if (!value) return null;
 
-        // extend가 없으면 그대로 반환
+        // Return as-is if no extend
         if (!('extend' in value)) {
             result[key] = value;
             return value;
         }
 
-        // 순환 참조 감지
+        // Detect circular reference
         if (resolving.has(key)) {
             console.warn(`[PT] Circular reference detected: "${key}" - ignoring extend.`);
             const { extend, ...withoutExtend } = value;
@@ -80,13 +80,13 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
             return withoutExtend;
         }
 
-        // 해결 시작
+        // Start resolving
         resolving.add(key);
 
         const { extend, class: extendClass, ...rest } = value;
         const baseAttrs = resolveExtend(extend as string);
 
-        // extend 대상이 없거나 순환 참조로 실패한 경우
+        // If extend target not found or failed due to circular reference
         if (!baseAttrs) {
             console.warn(`[PT] Extend target "${extend}" not found: "${key}"`);
             result[key] = { ...rest, class: extendClass || '' };
@@ -96,7 +96,7 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 
         const { class: baseClass, ...baseRest } = baseAttrs;
 
-        // extend 대상을 병합
+        // Merge extend target
         result[key] = {
             ...baseRest,
             ...rest,
@@ -107,35 +107,35 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
         return result[key];
     };
 
-    // 모든 키에 대해 extend 해결
+    // Resolve extend for all keys
     for (const key in normalized) {
         resolveExtend(key);
     }
 
-    // 캐시에 저장 (다음 호출 시 재사용)
+    // Save to cache (reuse on next call)
     themeCache.set(theme, result);
 
     return result;
 }
 
 // ============================================
-// Core 함수
+// Core Functions
 // ============================================
 
 /**
- * attrs에서 pt 관련 속성 추출
+ * Extract pt-related attributes from attrs
  *
- * 지원 형식:
- * - :pt="{ root: 'class' }" → 객체 형태
- * - pt:root="class" → shorthand (단일 키)
- * - pt:root:class="value" → 중첩 속성 (class, id, onClick 등)
+ * Supported formats:
+ * - :pt="{ root: 'class' }" → object form
+ * - pt:root="class" → shorthand (single key)
+ * - pt:root:class="value" → nested attributes (class, id, onClick, etc.)
  */
 export function attrsToPt(): PtSpec {
     const attrs = useAttrs()
     let pt = {} as PtSpec;
 
     for (const attrKey in attrs) {
-        // :pt="{ ... }" 형태 처리
+        // Handle :pt="{ ... }" format
         if (attrKey === 'pt') {
             const ptValue = attrs[attrKey];
             if (isObject(ptValue)) {
@@ -144,14 +144,14 @@ export function attrsToPt(): PtSpec {
             continue;
         }
 
-        // pt:로 시작하지 않으면 스킵
+        // Skip if doesn't start with pt:
         if (!attrKey.startsWith('pt:')) continue;
 
         const keys = attrKey.slice(3).split(':');
         const value = attrs[attrKey];
         let current: any = pt;
 
-        // pt:root="text" 형태 → { root: { class: "text" } }
+        // pt:root="text" format → { root: { class: "text" } }
         if (keys.length === 1) {
             const key = keys[0];
             if (!key) continue;
@@ -170,8 +170,8 @@ export function attrsToPt(): PtSpec {
             continue;
         }
 
-        // pt:root:class="text" 형태 → 중첩 객체 생성
-        // 마지막 키 전까지 중첩 객체 생성
+        // pt:root:class="text" format → create nested object
+        // Create nested objects up to the last key
         for (let i = 0; i < keys.length - 1; i++) {
             const key = keys[i];
             if (!key) continue;
@@ -182,7 +182,7 @@ export function attrsToPt(): PtSpec {
             current = current[key];
         }
 
-        // 마지막 키에 값 할당
+        // Assign value to the last key
         const lastKey = keys[keys.length - 1];
         if (lastKey) {
             current[lastKey] = value;
@@ -193,13 +193,13 @@ export function attrsToPt(): PtSpec {
 }
 
 /**
- * 두 PtSpec 객체를 병합
+ * Merge two PtSpec objects
  *
- * 병합 규칙:
- * 1. 문자열은 class shorthand로 취급 ({ class: "..." }로 변환)
- * 2. class 속성은 twMerge로 병합 (중복 제거)
- * 3. 다른 속성은 spread로 병합 (pt2가 우선)
- * 4. class가 없는 중첩 객체는 재귀적으로 병합
+ * Merge rules:
+ * 1. Strings are treated as class shorthand (converted to { class: "..." })
+ * 2. class attributes are merged with twMerge (remove duplicates)
+ * 3. Other attributes are merged with spread (pt2 takes priority)
+ * 4. Nested objects without class are recursively merged
  *
  * @example
  * mergePt(
@@ -215,26 +215,26 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
         const val1 = result[key];
         const val2 = pt2[key];
 
-        // pt2 값이 없으면 스킵
+        // Skip if pt2 value is empty
         if (!val2) continue;
 
-        // pt1 값이 없으면 pt2 값을 그대로 사용
+        // Use pt2 value as-is if pt1 value is empty
         if (!val1) {
             result[key] = val2;
             continue;
         }
 
-        // 문자열은 class shorthand로 취급 → 객체로 변환 후 병합
+        // Treat strings as class shorthand → convert to object and merge
         const normalized1 = isString(val1) ? { class: val1 } : val1;
         const normalized2 = isString(val2) ? { class: val2 } : val2;
 
-        // 둘 다 객체인 경우
+        // If both are objects
         if (isObject(normalized1) && isObject(normalized2)) {
             const hasClass = 'class' in normalized1 || 'class' in normalized2;
 
             if (hasClass) {
-                // class 속성이 있으면 HTML 속성 객체로 간주
-                // class 중복 방지: 수동으로 분리 후 병합
+                // If has class attribute, treat as HTML attributes object
+                // Prevent class duplication: manually separate and merge
                 const { class: class1, ...rest1 } = normalized1;
                 const { class: class2, ...rest2 } = normalized2;
 
@@ -244,12 +244,12 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
                     class: twMerge(class1 || '', class2 || '')
                 };
             } else {
-                // class가 없으면 중첩 PtSpec으로 간주하여 재귀 병합
+                // If no class, treat as nested PtSpec and recursively merge
                 result[key] = mergePt(normalized1 as PtSpec, normalized2 as PtSpec);
             }
         }
         else {
-            // 하나라도 객체가 아니면 pt2 값으로 덮어쓰기
+            // If either is not an object, overwrite with pt2 value
             result[key] = val2;
         }
     }
@@ -258,12 +258,12 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
 }
 
 /**
- * theme의 base 속성과 pt를 병합하여 최종 HTML 속성 반환
+ * Merge theme's base attributes with pt to return final HTML attributes
  *
- * @param key - 엘리먼트 키 (예: 'root', 'input', 'helper')
- * @param baseAttrs - theme에서 온 기본 속성
- * @param pt - 사용자가 전달한 pt (props.pt 또는 attrs)
- * @returns 병합된 HTML 속성 (v-bind에 전달)
+ * @param key - Element key (e.g., 'root', 'input', 'helper')
+ * @param baseAttrs - Base attributes from theme
+ * @param pt - User-provided pt (props.pt or attrs)
+ * @returns Merged HTML attributes (passed to v-bind)
  *
  * @example
  * // theme: { input: { class: "border" } }
@@ -278,13 +278,13 @@ function ptAttrs(
 ): Record<string, any> {
     const ptValue = pt?.[key];
 
-    // pt에 해당 키가 없으면 base 속성만 반환
+    // Return only base attributes if key not in pt
     if (!ptValue) return baseAttrs;
 
-    // baseAttrs에서 class 분리 (중복 방지 위해)
+    // Separate class from baseAttrs (to prevent duplication)
     const { class: baseClass, ...baseRest } = baseAttrs;
 
-    // 문자열인 경우 (class shorthand)
+    // If string (class shorthand)
     if (isString(ptValue)) {
         return {
             ...baseRest,
@@ -292,13 +292,13 @@ function ptAttrs(
         };
     }
 
-    // 객체인 경우
+    // If object
     if (isObject(ptValue)) {
         const { class: ptClass, ...ptRest } = ptValue;
         return {
             ...baseRest,
-            ...ptRest,  // pt의 다른 속성 병합 (id, onClick 등)
-            class: twMerge(baseClass || '', ptClass || '')  // class는 twMerge로 병합
+            ...ptRest,  // Merge other pt attributes (id, onClick, etc.)
+            class: twMerge(baseClass || '', ptClass || '')  // Merge class with twMerge
         };
     }
 
@@ -310,17 +310,17 @@ function ptAttrs(
 // ============================================
 
 /**
- * PassThrough 시스템: 컴포넌트 스타일 커스터마이징
+ * PassThrough system: Component style customization
  *
- * 3가지 소스에서 스타일을 병합:
- * 1. theme (컴포넌트 기본 스타일)
- * 2. attrs (부모에서 pt:root="..." 형태로 전달)
- * 3. propsPt (부모에서 :pt="{ root: '...' }" 형태로 전달)
+ * Merge styles from 3 sources:
+ * 1. theme (component default styles)
+ * 2. attrs (passed from parent as pt:root="..." format)
+ * 3. propsPt (passed from parent as :pt="{ root: '...' }" format)
  *
- * 병합 우선순위: theme < attrs < propsPt
+ * Merge priority: theme < attrs < propsPt
  *
- * @param theme - 기본 테마 (플랫 구조, 문자열은 자동으로 class로 변환)
- * @param propsPt - props.pt (선택사항, MaybeRef로 reactivity 자동 처리)
+ * @param theme - Default theme (flat structure, strings automatically converted to class)
+ * @param propsPt - props.pt (optional, MaybeRef for automatic reactivity handling)
  *
  * @example
  * const { pt } = usePassThrough({
@@ -334,25 +334,25 @@ export function usePassThrough(
     theme: PtSpec,
     propsPt?: MaybeRef<PtSpec>
 ) {
-    // 1. attrs에서 pt 추출 (computed로 반응성 유지)
-    //    예: pt:root="bg-red-500" → { root: { class: "bg-red-500" } }
+    // 1. Extract pt from attrs (maintain reactivity with computed)
+    //    Example: pt:root="bg-red-500" → { root: { class: "bg-red-500" } }
     const attrsPt = computed(() => attrsToPt());
 
-    // 2. theme 처리: 정규화 + extend 해결 (초기화 시 1번만 실행 - 성능 최적화)
-    //    문자열 → 객체 변환, extend 속성 처리
+    // 2. Process theme: normalization + extend resolution (execute once on initialization - performance optimization)
+    //    Convert strings → objects, process extend attributes
     const normalizedTheme = processTheme(theme);
 
-    // 3. propsPt를 computed로 unwrap (reactivity 유지)
+    // 3. Unwrap propsPt with computed (maintain reactivity)
     const resolvedPropsPt = computed(() => unref(propsPt) || {});
 
-    // 4. 최종 pt (디버깅용): props.pt replaces, attrs merges
-    //    - propsPt에 키가 있으면: propsPt[key]만 사용 (replace)
-    //    - propsPt에 키가 없으면: attrsPt[key] 사용 (merge with theme)
+    // 4. Final pt (for debugging): props.pt replaces, attrs merges
+    //    - If key exists in propsPt: use only propsPt[key] (replace)
+    //    - If key doesn't exist in propsPt: use attrsPt[key] (merge with theme)
     const debugPt = computed(() => {
         const result: PtSpec = { ...attrsPt.value };
         const propsValue = resolvedPropsPt.value;
 
-        // propsPt에 있는 키는 attrsPt를 무시하고 replace
+        // Keys in propsPt ignore attrsPt and replace
         for (const key in propsValue) {
             result[key] = propsValue[key];
         }
@@ -361,25 +361,25 @@ export function usePassThrough(
     });
 
     /**
-     * pt 함수: v-bind에 사용할 HTML 속성 반환
+     * pt function: Return HTML attributes for use with v-bind
      *
-     * Replace vs Merge 전략:
-     * - propsPt에 키가 있으면: theme 무시하고 propsPt만 사용 (REPLACE)
-     * - propsPt에 키가 없으면: theme + attrsPt 병합 (MERGE)
+     * Replace vs Merge strategy:
+     * - If key exists in propsPt: ignore theme and use only propsPt (REPLACE)
+     * - If key doesn't exist in propsPt: merge theme + attrsPt (MERGE)
      */
     const pt = (key: string): Record<string, any> => {
         const propsValue = resolvedPropsPt.value;
 
-        // propsPt에 키가 있으면 theme 무시 (REPLACE)
+        // If key exists in propsPt, ignore theme (REPLACE)
         if (key in propsValue) {
             const ptValue = propsValue[key];
 
-            // 문자열인 경우 (class shorthand)
+            // If string (class shorthand)
             if (isString(ptValue)) {
                 return { class: ptValue };
             }
 
-            // 객체인 경우
+            // If object
             if (isObject(ptValue)) {
                 return ptValue as Record<string, any>;
             }
@@ -387,25 +387,25 @@ export function usePassThrough(
             return {};
         }
 
-        // propsPt에 키가 없으면 theme + attrsPt 병합 (MERGE)
+        // If key doesn't exist in propsPt, merge theme + attrsPt (MERGE)
         const baseAttrs = normalizedTheme[key] || {};
         return ptAttrs(key, baseAttrs, attrsPt.value);
     };
 
     /**
-     * 하위 컴포넌트로 pt 전달 헬퍼
+     * Helper to pass pt to child components
      *
-     * class 속성이 없는 중첩 객체만 추출하여 하위 컴포넌트에 전달
-     * Replace 전략 적용: propsPt에 키가 있으면 theme 무시, 없으면 theme 사용
+     * Extract only nested objects without class attribute and pass to child components
+     * Apply replace strategy: ignore theme if key exists in propsPt, use theme otherwise
      *
      * @example
-     * // Button 컴포넌트에서
+     * // In Button component
      * <Badge :pt="ptFor('badge')" />
      */
     const ptFor = (componentKey: string): PtSpec => {
         const propsValue = resolvedPropsPt.value;
 
-        // 중첩 PtSpec 추출 헬퍼 (class가 없으면 중첩 객체로 간주)
+        // Helper to extract nested PtSpec (treat as nested object if no class)
         const getNestedPt = (val: any): PtSpec => {
             if (!val) return {};
             if (isObject(val) && !('class' in val)) {
@@ -414,13 +414,13 @@ export function usePassThrough(
             return {};
         };
 
-        // propsPt에 키가 있으면 theme 무시 (REPLACE)
+        // If key exists in propsPt, ignore theme (REPLACE)
         if (componentKey in propsValue) {
             return getNestedPt(propsValue[componentKey]);
         }
 
-        // propsPt에 키가 없으면 theme + attrs 사용
-        // attrs는 이미 debugPt에 반영되어 있음
+        // If key doesn't exist in propsPt, use theme + attrs
+        // attrs are already reflected in debugPt
         const attrsValue = attrsPt.value[componentKey];
         if (attrsValue) {
             const nested = getNestedPt(attrsValue);
@@ -429,30 +429,30 @@ export function usePassThrough(
             }
         }
 
-        // attrs에도 없으면 theme 사용
+        // If not in attrs either, use theme
         const themeValue = normalizedTheme[componentKey];
         return getNestedPt(themeValue);
     };
 
     return {
         /**
-         * v-bind에 사용할 pt 함수 (완전한 reactivity)
+         * pt function for use with v-bind (full reactivity)
          * @example v-bind="pt('root')"
          */
         pt,
 
         /**
-         * 하위 컴포넌트로 pt 전달
+         * Pass pt to child components
          * @example <Badge :pt="ptFor('badge')" />
          */
         ptFor,
 
         /**
-         * 최종 병합된 pt 스펙 (디버깅용)
+         * Final merged pt spec (for debugging)
          */
         debugPt
     };
 }
 
-// 별칭 (더 짧게 사용하고 싶은 경우)
+// Alias (for shorter usage)
 export const usePt = usePassThrough;
