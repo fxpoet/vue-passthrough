@@ -6,6 +6,7 @@ export interface PtSpec {
     [key: string]: string | Record<string, any> | PtSpec | undefined;
 }
 
+
 // ============================================
 // Theme Processing
 // ============================================
@@ -38,10 +39,9 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
     const normalized: Record<string, Record<string, any>> = {};
 
     for (const key in theme) {
-        const value = theme[key];
-        const normalized_value = normalizeValue(value);
-        if (!isEmpty(normalized_value)) {
-            normalized[key] = normalized_value;
+        const nValue = normalizeValue(theme[key]);
+        if (!isEmpty(nValue)) {
+            normalized[key] = nValue;
         }
     }
 
@@ -105,12 +105,10 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
         return result[key];
     };
 
-    // Resolve extend for all keys
     for (const key in normalized) {
         resolveExtend(key);
     }
 
-    // Save to cache (reuse on next call)
     themeCache.set(theme, result);
 
     return result;
@@ -122,7 +120,6 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 
 /**
  * Merge single key pt attribute (pt:root="class")
- * @internal Exported for testing purposes
  */
 function mergeSingleKeyAttr(pt: PtSpec, key: string, value: unknown): void {
     if (!key) return;
@@ -144,7 +141,6 @@ function mergeSingleKeyAttr(pt: PtSpec, key: string, value: unknown): void {
 
 /**
  * Merge nested pt attribute (pt:root:class="value")
- * @internal Exported for testing purposes
  */
 function mergeNestedAttr(pt: PtSpec, keys: string[], value: unknown): void {
     let current: Record<string, unknown> = pt;
@@ -276,7 +272,6 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
 
 /**
  * Extract nested PtSpec from a value (only if it doesn't have a class attribute)
- * @internal Exported for testing purposes
  */
 function extractNestedPt(value: unknown): PtSpec {
     if (!value) return {};
