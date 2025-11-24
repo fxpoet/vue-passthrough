@@ -1,0 +1,22 @@
+# Development files
+playground/
+vite.config.playground.ts
+
+# Tests
+tests/
+*.test.ts
+*.spec.ts
+vitest.config.ts
+vitest.setup.ts
+
+# Config files
+.vscode/
+.claude/
+.git/
+.github/
+tsconfig.json
+package-lock.json
+
+# Other
+node_modules/
+*.log
