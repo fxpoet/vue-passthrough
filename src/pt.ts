@@ -2,20 +2,14 @@ import { useAttrs, computed, unref, type MaybeRef } from 'vue'
 import { twMerge } from 'tailwind-merge';
 import { isString, isObject, isEmpty, warn } from './utils';
 
-// ============================================
-// Type Definitions
-// ============================================
 
 export interface PtSpec {
     [key: string]: string | Record<string, any> | PtSpec | undefined;
 }
 
-// ============================================
-// Theme Processing
-// ============================================
-
 // Theme processing result cache (using WeakMap to prevent memory leaks)
 const themeCache = new WeakMap<PtSpec, Record<string, Record<string, any>>>();
+
 
 /**
  * Theme processing: Normalization + extend resolution in one step
@@ -32,9 +26,11 @@ const themeCache = new WeakMap<PtSpec, Record<string, Record<string, any>>>();
  * })
  */
 function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
+
     // Check cache (performance optimization)
     const cached = themeCache.get(theme);
     if (cached) return cached;
+
     // Step 1: Normalization (string → object)
     const normalized: Record<string, Record<string, any>> = {};
 
@@ -381,73 +377,6 @@ function ptAttrs(
  *   - `ptFor(key)` - Function to extract nested pt for child components
  *   - `debugPt` - Computed ref with final merged pt spec (for debugging)
  *
- * @example Basic usage
- * ```vue
- * <script setup lang="ts">
- * import { usePassThrough, type PtSpec } from 'vue-passthrough'
- *
- * const props = defineProps<{ pt?: PtSpec }>()
- *
- * const { pt } = usePassThrough({
- *   root: "grid gap-2",
- *   input: "border px-3"
- * }, computed(() => props.pt))
- * </script>
- *
- * <template>
- *   <div v-bind="pt('root')">
- *     <input v-bind="pt('input')" />
- *   </div>
- * </template>
- * ```
- *
- * @example Replace strategy (props.pt)
- * ```vue
- * <!-- Theme: { root: "grid gap-2" } -->
- * <MyComponent :pt="{ root: 'flex flex-row' }" />
- * <!-- Result: class="flex flex-row" (theme completely ignored) -->
- * ```
- *
- * @example Merge strategy (attrs)
- * ```vue
- * <!-- Theme: { root: "grid gap-2" } -->
- * <MyComponent pt:root="p-4 bg-white" />
- * <!-- Result: class="grid gap-2 p-4 bg-white" (additive merge) -->
- * ```
- *
- * @example Extend pattern
- * ```vue
- * <script setup>
- * const { pt } = usePassThrough({
- *   input: "w-full border px-3 py-2",
- *   inputInvalid: {
- *     extend: 'input',
- *     class: "border-red-500"
- *   }
- * })
- * </script>
- * <!-- inputInvalid inherits from input and adds red border -->
- * ```
- *
- * @example Nested components (ptFor)
- * ```vue
- * <script setup>
- * const { pt, ptFor } = usePassThrough({
- *   root: "flex gap-2",
- *   badge: {
- *     root: "px-2 py-1",
- *     label: "text-xs"
- *   }
- * })
- * </script>
- *
- * <template>
- *   <div v-bind="pt('root')">
- *     <Badge :pt="ptFor('badge')" />
- *   </div>
- * </template>
- * ```
- *
  * @see {@link https://github.com/fxpoet/vue-passthrough#usage | Usage Guide}
  * @see {@link https://github.com/fxpoet/vue-passthrough#api | API Reference}
  */
@@ -533,21 +462,8 @@ export function usePassThrough(
     };
 
     return {
-        /**
-         * pt function for use with v-bind (full reactivity)
-         * @example v-bind="pt('root')"
-         */
         pt,
-
-        /**
-         * Pass pt to child components
-         * @example <Badge :pt="ptFor('badge')" />
-         */
         ptFor,
-
-        /**
-         * Final merged pt spec (for debugging)
-         */
         debugPt
     };
 }
@@ -556,43 +472,136 @@ export function usePassThrough(
 export const usePt = usePassThrough;
 
 // ============================================
-// Internal utilities (exported for testing)
+// Type Helpers
 // ============================================
 
 /**
- * Internal utilities exposed for testing purposes.
- * These are not part of the public API and may change without notice.
+ * Define a strongly-typed theme with improved type inference
  *
- * @internal
- * @example
+ * This helper function provides better TypeScript support by preserving
+ * the exact structure of your theme, enabling autocomplete for pt() keys
+ * and compile-time validation of theme references.
+ *
+ * @param theme - Theme configuration object
+ * @returns The same theme object with preserved type information
+ *
+ * @example Basic usage
  * ```ts
- * import { _internal } from 'vue-passthrough'
+ * const myTheme = defineTheme({
+ *   root: 'grid gap-2',
+ *   input: 'border px-3',
+ *   helper: 'text-xs text-gray-500'
+ * })
  *
- * // Testing type guards
- * expect(_internal.isString('test')).toBe(true)
- * expect(_internal.isObject([])).toBe(false) // Arrays are not plain objects
+ * const { pt } = usePassThrough(myTheme)
+ * pt('root')   // ✅ Autocomplete suggests: 'root' | 'input' | 'helper'
+ * pt('invalid') // ❌ TypeScript error: Argument not assignable
+ * ```
  *
- * // Testing normalization
- * const result = _internal.normalizePtValue('text-red-500')
- * expect(result).toEqual({ class: 'text-red-500' })
+ * @example With extend
+ * ```ts
+ * const theme = defineTheme({
+ *   input: 'border rounded px-3 py-2',
+ *   inputError: {
+ *     extend: 'input',
+ *     class: 'border-red-500'
+ *   }
+ * })
+ * ```
+ *
+ * @example Nested components
+ * ```ts
+ * const theme = defineTheme({
+ *   root: 'flex gap-4',
+ *   badge: {
+ *     root: 'px-2 py-1 rounded',
+ *     label: 'text-xs font-medium',
+ *     icon: 'w-4 h-4'
+ *   }
+ * })
+ *
+ * const { pt, ptFor } = usePassThrough(theme)
+ * const badgePt = ptFor('badge') // Typed nested pt spec
  * ```
  */
-export const _internal = {
-    // Core processing
-    processTheme,
+export function defineTheme<T extends PtSpec>(theme: T): T {
+    return theme;
+}
 
-    // Utility functions
+/**
+ * Type helper to extract theme keys for better type checking
+ *
+ * Useful when you need to work with theme keys in a type-safe manner.
+ *
+ * @example
+ * ```ts
+ * const theme = defineTheme({
+ *   root: 'grid',
+ *   input: 'border',
+ *   helper: 'text-xs'
+ * })
+ *
+ * type MyThemeKeys = ThemeKeys<typeof theme> // 'root' | 'input' | 'helper'
+ *
+ * function customPtFunction(key: MyThemeKeys) {
+ *   // key is now type-safe
+ * }
+ * ```
+ */
+export type ThemeKeys<T extends PtSpec> = keyof T & string;
+
+/**
+ * Create a typed pt function with better autocomplete
+ *
+ * This is an alternative to usePassThrough that provides stronger typing
+ * for the pt() function keys when you have a statically defined theme.
+ *
+ * @param theme - Theme configuration (use defineTheme for best results)
+ * @param propsPt - Optional pt from props
+ * @returns Object with typed pt, ptFor, and debugPt
+ *
+ * @example
+ * ```ts
+ * const theme = defineTheme({
+ *   root: 'grid gap-2',
+ *   input: 'border px-3'
+ * })
+ *
+ * const props = defineProps<{ pt?: PtSpec }>()
+ *
+ * // pt() now has autocomplete for 'root' | 'input'
+ * const { pt } = useTypedPassThrough(theme, computed(() => props.pt))
+ * ```
+ */
+export function useTypedPassThrough<T extends PtSpec>(
+    theme: T,
+    propsPt?: MaybeRef<PtSpec>
+) {
+    const base = usePassThrough(theme, propsPt);
+
+    return {
+        ...base,
+        /**
+         * Get HTML attributes with type-safe key parameter
+         * @param key - Theme key (autocomplete enabled)
+         */
+        pt: (key: ThemeKeys<T>): Record<string, any> => base.pt(key),
+
+        /**
+         * Extract nested pt for child components with type-safe key
+         * @param key - Theme key (autocomplete enabled)
+         */
+        ptFor: (key: ThemeKeys<T>): PtSpec => base.ptFor(key)
+    };
+}
+
+
+// Internal utilities (exported for testing)
+export const _internal = {
+    processTheme,
     extractNestedPt,
     normalizePtValue,
     mergeSingleKeyAttr,
     mergeNestedAttr,
-    ptAttrs,
-
-    // Type guards
-    isString,
-    isObject,
-    isEmpty,
-
-    // Development helpers
-    warn
+    ptAttrs
 } as const;
