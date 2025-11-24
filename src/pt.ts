@@ -120,6 +120,23 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 
 /**
  * Merge single key pt attribute (pt:root="class")
+ *
+ * Handles the shorthand syntax where only a key is specified.
+ * The value is treated as a class string and merged with existing classes.
+ *
+ * @param pt - Target PtSpec object to merge into
+ * @param key - Element key (e.g., 'root', 'input')
+ * @param value - Class string to merge
+ *
+ * @example
+ * const pt = { root: { class: "grid" } }
+ * mergeSingleKeyAttr(pt, "root", "gap-2")
+ * // → pt.root = { class: "grid gap-2" }
+ *
+ * @example
+ * const pt = {}
+ * mergeSingleKeyAttr(pt, "input", "border px-3")
+ * // → pt.input = { class: "border px-3" }
  */
 function mergeSingleKeyAttr(pt: PtSpec, key: string, value: unknown): void {
     if (!key) return;
@@ -141,6 +158,28 @@ function mergeSingleKeyAttr(pt: PtSpec, key: string, value: unknown): void {
 
 /**
  * Merge nested pt attribute (pt:root:class="value")
+ *
+ * Handles the nested syntax where multiple keys are specified.
+ * Creates nested objects and assigns the value to the final key.
+ *
+ * @param pt - Target PtSpec object to merge into
+ * @param keys - Array of nested keys (e.g., ['root', 'class'] or ['input', 'onClick'])
+ * @param value - Value to assign to the final key
+ *
+ * @example
+ * const pt = {}
+ * mergeNestedAttr(pt, ["root", "class"], "grid gap-2")
+ * // → pt.root = { class: "grid gap-2" }
+ *
+ * @example
+ * const pt = { input: { class: "border" } }
+ * mergeNestedAttr(pt, ["input", "onClick"], () => console.log('clicked'))
+ * // → pt.input = { class: "border", onClick: [Function] }
+ *
+ * @example
+ * const pt = {}
+ * mergeNestedAttr(pt, ["root", "id"], "my-element")
+ * // → pt.root = { id: "my-element" }
  */
 function mergeNestedAttr(pt: PtSpec, keys: string[], value: unknown): void {
     let current: Record<string, unknown> = pt;
@@ -281,6 +320,28 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
 
 /**
  * Extract nested PtSpec from a value (only if it doesn't have a class attribute)
+ *
+ * Used to extract nested pt specifications for child components.
+ * Objects with a 'class' attribute are considered HTML attributes, not nested pt specs.
+ *
+ * @param value - Value to extract nested pt from
+ * @returns Nested PtSpec if valid, empty object otherwise
+ *
+ * @example
+ * extractNestedPt({ root: "grid", input: "border" })
+ * // → { root: "grid", input: "border" }
+ *
+ * @example
+ * extractNestedPt({ class: "border", onClick: fn })
+ * // → {} (has class attribute, treated as HTML attributes)
+ *
+ * @example
+ * extractNestedPt("text-sm")
+ * // → {} (not an object)
+ *
+ * @example
+ * extractNestedPt(null)
+ * // → {} (falsy value)
  */
 function extractNestedPt(value: unknown): PtSpec {
     if (!value) return {};
@@ -300,12 +361,31 @@ function extractNestedPt(value: unknown): PtSpec {
  * @param pt - User-provided pt (props.pt or attrs)
  * @returns Merged HTML attributes (passed to v-bind)
  *
- * @example
- * // theme: { input: { class: "border", onClick: fn1 } }
- * // pt: { input: { class: "border-red-500", onClick: fn2, id: "my-input" } }
- * ptAttrs('input', { class: "border", onClick: fn1 }, pt)
+ * @example Input
+ * ptAttrs('input',
+ *   { class: "border", onClick: fn1 },
+ *   { input: { class: "border-red-500", onClick: fn2, id: "my-input" } }
+ * )
+ *
+ * @example Output
  * // → { class: "border-red-500", onClick: [fn1, fn2], id: "my-input" }
  * // Both onClick handlers will execute, class conflicts resolved by tailwind-merge
+ *
+ * @example Input - No pt override
+ * ptAttrs('helper', { class: "text-sm text-gray-500" }, {})
+ *
+ * @example Output
+ * // → { class: "text-sm text-gray-500" }
+ *
+ * @example Input - Tailwind conflict resolution
+ * ptAttrs('root',
+ *   { class: "p-4 bg-blue-500" },
+ *   { root: { class: "p-6 bg-red-500" } }
+ * )
+ *
+ * @example Output
+ * // → { class: "p-6 bg-red-500" }
+ * // Later values override conflicting utilities (p-6 overrides p-4, bg-red-500 overrides bg-blue-500)
  */
 function ptAttrs(
     key: string,
