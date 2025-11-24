@@ -358,7 +358,7 @@ function ptAttrs(
  */
 export function usePassThrough(
     theme: PtSpec,
-    propsPt?: MaybeRef<PtSpec>
+    propsPt?: MaybeRef<PtSpec | undefined>
 ) {
     // 1. Extract pt from attrs (maintain reactivity with computed)
     //    Example: pt:root="bg-red-500" → { root: { class: "bg-red-500" } }
@@ -551,7 +551,7 @@ export type ThemeKeys<T extends PtSpec> = keyof T & string;
  */
 export function useTypedPassThrough<T extends PtSpec>(
     theme: T,
-    propsPt?: MaybeRef<PtSpec>
+    propsPt?: MaybeRef<PtSpec | undefined>
 ) {
     const base = usePassThrough(theme, propsPt);
 

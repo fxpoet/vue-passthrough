@@ -396,6 +396,143 @@ describe('PassThrough System', () => {
             wrapper.find('div').trigger('click')
             expect(onClick).toHaveBeenCalled()
         })
+
+        it('reactivity: updates when attrs pt:* values change', async () => {
+            const dynamicClass = ref('bg-red-500')
+
+            const ChildComponent = defineComponent({
+                template: '<div v-bind="pt(\'root\')" data-testid="child">child</div>',
+                setup() {
+                    const { pt } = usePassThrough({
+                        root: 'grid gap-2'
+                    })
+                    return { pt }
+                }
+            })
+
+            const ParentComponent = defineComponent({
+                components: { ChildComponent },
+                template: `<ChildComponent :pt:root="dynamicClass" />`,
+                setup() {
+                    return { dynamicClass }
+                }
+            })
+
+            const wrapper = mount(ParentComponent)
+            const childEl = wrapper.find('[data-testid="child"]').element as HTMLElement
+
+            // Initial state: theme + dynamicClass
+            expect(childEl.className).toContain('grid')
+            expect(childEl.className).toContain('gap-2')
+            expect(childEl.className).toContain('bg-red-500')
+
+            // Change ref value
+            dynamicClass.value = 'bg-blue-500 p-4'
+            await nextTick()
+
+            // Should update to new value
+            expect(childEl.className).toContain('grid')
+            expect(childEl.className).toContain('gap-2')
+            expect(childEl.className).toContain('bg-blue-500')
+            expect(childEl.className).toContain('p-4')
+            expect(childEl.className).not.toContain('bg-red-500')
+        })
+
+        it('reactivity: updates when attrs :pt object values change', async () => {
+            const dynamicPt = ref<Record<string, any>>({ root: 'bg-red-500' })
+
+            const ChildComponent = defineComponent({
+                template: '<div v-bind="pt(\'root\')" data-testid="child">child</div>',
+                setup() {
+                    const { pt } = usePassThrough({
+                        root: 'grid gap-2'
+                    })
+                    return { pt }
+                }
+            })
+
+            const ParentComponent = defineComponent({
+                components: { ChildComponent },
+                template: `<ChildComponent :pt="dynamicPt" />`,
+                setup() {
+                    return { dynamicPt }
+                }
+            })
+
+            const wrapper = mount(ParentComponent)
+            const childEl = wrapper.find('[data-testid="child"]').element as HTMLElement
+
+            // Initial state: theme + dynamicPt
+            expect(childEl.className).toContain('grid')
+            expect(childEl.className).toContain('gap-2')
+            expect(childEl.className).toContain('bg-red-500')
+
+            // Change ref value
+            dynamicPt.value = { root: 'bg-blue-500 p-4' }
+            await nextTick()
+
+            // Should update to new value
+            expect(childEl.className).toContain('grid')
+            expect(childEl.className).toContain('gap-2')
+            expect(childEl.className).toContain('bg-blue-500')
+            expect(childEl.className).toContain('p-4')
+            expect(childEl.className).not.toContain('bg-red-500')
+        })
+
+        it('reactivity: pt:* attrs merge additively while :pt replaces', async () => {
+            const attrsClass = ref('text-sm')
+            const propsPt = ref<PtSpec | undefined>(undefined)
+
+            const ChildComponent = defineComponent({
+                props: {
+                    pt: {
+                        type: Object as () => PtSpec | undefined,
+                        default: undefined
+                    }
+                },
+                template: '<div v-bind="ptFunc(\'root\')" data-testid="child">child</div>',
+                setup(props) {
+                    const { pt } = usePassThrough({
+                        root: 'grid gap-2'
+                    }, computed(() => props.pt))
+                    return { ptFunc: pt }
+                }
+            })
+
+            const ParentComponent = defineComponent({
+                components: { ChildComponent },
+                template: `<ChildComponent :pt:root="attrsClass" :pt="propsPt" />`,
+                setup() {
+                    return { attrsClass, propsPt }
+                }
+            })
+
+            const wrapper = mount(ParentComponent)
+            const childEl = wrapper.find('[data-testid="child"]').element as HTMLElement
+
+            // Initial: attrs merge with theme
+            expect(childEl.className).toContain('grid')
+            expect(childEl.className).toContain('gap-2')
+            expect(childEl.className).toContain('text-sm')
+
+            // Change to props.pt (should replace, not merge)
+            propsPt.value = { root: 'flex flex-row' }
+            await nextTick()
+
+            // props.pt replaces everything
+            expect(childEl.className).toBe('flex flex-row')
+            expect(childEl.className).not.toContain('grid')
+            expect(childEl.className).not.toContain('text-sm')
+
+            // Remove props.pt, attrs should work again
+            propsPt.value = undefined
+            await nextTick()
+
+            // Back to theme + attrs merge
+            expect(childEl.className).toContain('grid')
+            expect(childEl.className).toContain('gap-2')
+            expect(childEl.className).toContain('text-sm')
+        })
     })
 
     // ============================================
