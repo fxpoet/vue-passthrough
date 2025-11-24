@@ -325,6 +325,187 @@ describe('PassThrough System', () => {
     })
 
     // ============================================
+    // Tailwind-merge and mergeProps integration tests
+    // ============================================
+    describe('tailwind-merge integration', () => {
+        it('resolves conflicting Tailwind classes (padding)', () => {
+            const result = mergePt(
+                { root: { class: 'px-2 py-3' } },
+                { root: { class: 'px-4' } }
+            )
+
+            // px-4 should override px-2
+            expect((result.root as any).class).toContain('px-4')
+            expect((result.root as any).class).not.toContain('px-2')
+            expect((result.root as any).class).toContain('py-3')
+        })
+
+        it('resolves conflicting Tailwind classes (text size)', () => {
+            const result = mergePt(
+                { root: { class: 'text-sm font-bold' } },
+                { root: { class: 'text-lg' } }
+            )
+
+            // text-lg should override text-sm
+            expect((result.root as any).class).toContain('text-lg')
+            expect((result.root as any).class).not.toContain('text-sm')
+            expect((result.root as any).class).toContain('font-bold')
+        })
+
+        it('resolves conflicting Tailwind classes (background)', () => {
+            const result = mergePt(
+                { root: { class: 'bg-red-500 text-white' } },
+                { root: { class: 'bg-blue-600' } }
+            )
+
+            // bg-blue-600 should override bg-red-500
+            expect((result.root as any).class).toContain('bg-blue-600')
+            expect((result.root as any).class).not.toContain('bg-red-500')
+            expect((result.root as any).class).toContain('text-white')
+        })
+
+        it('chains event handlers with mergeProps', () => {
+            const handler1 = vi.fn()
+            const handler2 = vi.fn()
+
+            const result = mergePt(
+                { root: { class: 'border', onClick: handler1 } },
+                { root: { class: 'rounded', onClick: handler2 } }
+            )
+
+            // Both handlers should be in the result
+            const onClick = (result.root as any).onClick
+            expect(onClick).toBeDefined()
+
+            // Call the merged handler
+            if (Array.isArray(onClick)) {
+                onClick.forEach((fn: any) => fn())
+            } else if (typeof onClick === 'function') {
+                onClick()
+            }
+
+            // Both handlers should have been called
+            expect(handler1).toHaveBeenCalled()
+            expect(handler2).toHaveBeenCalled()
+        })
+
+        it('merges style objects', () => {
+            const result = mergePt(
+                { root: { class: 'border', style: { color: 'red' } } },
+                { root: { class: 'rounded', style: { fontSize: '12px' } } }
+            )
+
+            const style = (result.root as any).style
+            expect(style).toBeDefined()
+            expect(style.color).toBe('red')
+            expect(style.fontSize).toBe('12px')
+        })
+
+        it('preserves non-conflicting attributes', () => {
+            const result = mergePt(
+                { root: { class: 'border', id: 'root-id', 'data-test': 'test1' } },
+                { root: { class: 'rounded', title: 'Root Element' } }
+            )
+
+            const root = result.root as any
+            expect(root.id).toBe('root-id')
+            expect(root['data-test']).toBe('test1')
+            expect(root.title).toBe('Root Element')
+            expect(root.class).toContain('border')
+            expect(root.class).toContain('rounded')
+        })
+
+        it('handles multiple event handlers in usePassThrough', () => {
+            const themeHandler = vi.fn()
+            const attrHandler = vi.fn()
+
+            const TestComponent = defineComponent({
+                template: '<div v-bind="pt(\'root\')" data-testid="root">test</div>',
+                setup() {
+                    const { pt } = usePassThrough({
+                        root: { class: 'border', onClick: themeHandler }
+                    })
+                    return { pt }
+                }
+            })
+
+            const wrapper = mount(TestComponent, {
+                attrs: {
+                    'pt:root:onClick': attrHandler
+                }
+            })
+
+            wrapper.find('[data-testid="root"]').trigger('click')
+
+            // Both handlers should be called
+            expect(themeHandler).toHaveBeenCalled()
+            expect(attrHandler).toHaveBeenCalled()
+        })
+
+        it('applies tailwind-merge in usePassThrough with conflicting classes', () => {
+            const TestComponent = defineComponent({
+                template: '<div v-bind="pt(\'root\')" data-testid="root">test</div>',
+                setup() {
+                    const { pt } = usePassThrough({
+                        root: 'px-2 py-4 bg-red-500'
+                    })
+                    return { pt }
+                }
+            })
+
+            const wrapper = mount(TestComponent, {
+                attrs: {
+                    'pt:root': 'px-6 bg-blue-600'
+                }
+            })
+
+            const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+
+            // px-6 should override px-2, bg-blue-600 should override bg-red-500
+            expect(rootEl.className).toContain('px-6')
+            expect(rootEl.className).not.toContain('px-2')
+            expect(rootEl.className).toContain('bg-blue-600')
+            expect(rootEl.className).not.toContain('bg-red-500')
+            // py-4 should remain (no conflict)
+            expect(rootEl.className).toContain('py-4')
+        })
+
+        it('applies tailwind-merge with props.pt replacement', () => {
+            const TestComponent = defineComponent({
+                props: {
+                    customPt: {
+                        type: Object as () => PtSpec,
+                        default: () => ({})
+                    }
+                },
+                template: '<div v-bind="ptFunc(\'root\')" data-testid="root">test</div>',
+                setup(props) {
+                    const { pt } = usePassThrough({
+                        root: 'px-2 py-4'
+                    }, computed(() => props.customPt))
+                    return { ptFunc: pt }
+                }
+            })
+
+            const wrapper = mount(TestComponent, {
+                props: {
+                    customPt: { root: 'px-6 py-2 bg-blue-600' }
+                }
+            })
+
+            const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+
+            // props.pt replaces theme completely (no merge)
+            // But within props.pt itself, if there were conflicts, tailwind-merge would resolve them
+            expect(rootEl.className).toContain('px-6')
+            expect(rootEl.className).toContain('py-2')
+            expect(rootEl.className).toContain('bg-blue-600')
+            expect(rootEl.className).not.toContain('px-2')
+            expect(rootEl.className).not.toContain('py-4')
+        })
+    })
+
+    // ============================================
     // usePassThrough + attrs integration tests
     // ============================================
     describe('attrs integration tests (pt:root, etc.)', () => {

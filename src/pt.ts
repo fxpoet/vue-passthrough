@@ -1,4 +1,4 @@
-import { useAttrs, computed, unref, type MaybeRef } from 'vue'
+import { useAttrs, computed, unref, mergeProps, type MaybeRef } from 'vue'
 import { twMerge } from 'tailwind-merge';
 import { isString, isObject, isEmpty, warn, toClassObject, normalizeValue } from './utils';
 
@@ -208,18 +208,24 @@ export function attrsToPt(): PtSpec {
 /**
  * Merge two PtSpec objects
  *
+ * Uses Vue's mergeProps for proper event handler chaining and style merging,
+ * combined with tailwind-merge for class conflict resolution.
+ *
  * Merge rules:
  * 1. Strings are treated as class shorthand (converted to { class: "..." })
- * 2. class attributes are merged with twMerge (remove duplicates)
- * 3. Other attributes are merged with spread (pt2 takes priority)
+ * 2. HTML attributes are merged with Vue's mergeProps (event handlers are chained)
+ * 3. class attributes are further processed with twMerge (remove Tailwind conflicts)
  * 4. Nested objects without class are recursively merged
  *
  * @example
  * mergePt(
- *   { root: "grid", helper: { class: "text-sm" } },
- *   { root: "gap-2", helper: { class: "text-red-500" } }
+ *   { root: "grid", helper: { class: "text-sm", onClick: fn1 } },
+ *   { root: "gap-2", helper: { class: "text-red-500", onClick: fn2 } }
  * )
- * // → { root: { class: "grid gap-2" }, helper: { class: "text-sm text-red-500" } }
+ * // → {
+ * //   root: { class: "grid gap-2" },
+ * //   helper: { class: "text-sm text-red-500", onClick: [fn1, fn2] }
+ * // }
  */
 export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
     const result: PtSpec = { ...pt1 };
@@ -247,15 +253,18 @@ export function mergePt(pt1: PtSpec, pt2: PtSpec): PtSpec {
 
             if (hasClass) {
                 // If has class attribute, treat as HTML attributes object
-                // Prevent class duplication: manually separate and merge
-                const { class: class1, ...rest1 } = normalized1;
-                const { class: class2, ...rest2 } = normalized2;
+                // Use mergeProps for proper event handler chaining and style merging
+                const merged = mergeProps(
+                    normalized1 as Record<string, any>,
+                    normalized2 as Record<string, any>
+                );
 
-                result[key] = {
-                    ...rest1,
-                    ...rest2,
-                    class: twMerge(class1 || '', class2 || '')
-                };
+                // Apply tailwind-merge to class for conflict resolution
+                if (merged.class !== undefined && merged.class !== null) {
+                    merged.class = twMerge(merged.class as string);
+                }
+
+                result[key] = merged;
             } else {
                 // If no class, treat as nested PtSpec and recursively merge
                 result[key] = mergePt(normalized1 as PtSpec, normalized2 as PtSpec);
@@ -283,16 +292,20 @@ function extractNestedPt(value: unknown): PtSpec {
 /**
  * Merge theme's base attributes with pt to return final HTML attributes
  *
+ * Uses Vue's mergeProps for proper event handler chaining and style merging,
+ * combined with tailwind-merge for class conflict resolution.
+ *
  * @param key - Element key (e.g., 'root', 'input', 'helper')
  * @param baseAttrs - Base attributes from theme
  * @param pt - User-provided pt (props.pt or attrs)
  * @returns Merged HTML attributes (passed to v-bind)
  *
  * @example
- * // theme: { input: { class: "border" } }
- * // pt: { input: { class: "border-red-500", id: "my-input" } }
- * ptAttrs('input', { class: "border" }, pt)
- * // → { class: "border border-red-500", id: "my-input" }
+ * // theme: { input: { class: "border", onClick: fn1 } }
+ * // pt: { input: { class: "border-red-500", onClick: fn2, id: "my-input" } }
+ * ptAttrs('input', { class: "border", onClick: fn1 }, pt)
+ * // → { class: "border-red-500", onClick: [fn1, fn2], id: "my-input" }
+ * // Both onClick handlers will execute, class conflicts resolved by tailwind-merge
  */
 function ptAttrs(
     key: string,
@@ -307,15 +320,16 @@ function ptAttrs(
     // Normalize pt value to HTML attributes
     const normalized = normalizeValue(ptValue);
 
-    // Separate class from both objects for special merging
-    const { class: baseClass, ...baseRest } = baseAttrs;
-    const { class: ptClass, ...ptRest } = normalized;
+    // Use Vue's mergeProps for proper event handler chaining and style merging
+    const merged = mergeProps(baseAttrs, normalized);
 
-    return {
-        ...baseRest,
-        ...ptRest,  // Merge other pt attributes (id, onClick, etc.)
-        class: twMerge(baseClass || '', ptClass || '')  // Merge class with twMerge
-    };
+    // Apply tailwind-merge to class for conflict resolution
+    // (mergeProps concatenates classes, but we need tailwind conflict resolution)
+    if (merged.class !== undefined && merged.class !== null) {
+        merged.class = twMerge(merged.class as string);
+    }
+
+    return merged;
 }
 
 // ============================================
