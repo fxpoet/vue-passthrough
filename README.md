@@ -6,6 +6,8 @@ A Vue composable that allows you to inject styles and attributes directly into a
 
 > Inspired by [PrimeVue's PassThrough API](https://primevue.org/passthrough/)
 
+> **For LLMs/AI Tools:** See [LLM.txt](https://github.com/fxpoet/vue-passthrough/blob/master/LLM.txt) for a concise API reference optimized for AI assistance.
+
 ## Features
 
 - **Flexible Style Customization**: Inject classes and HTML attributes into any component element from the outside

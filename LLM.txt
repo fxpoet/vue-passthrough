@@ -1,0 +1,121 @@
+# vue-passthrough
+
+Vue composable for deep style customization of nested component elements with Tailwind CSS support.
+
+## Core API
+
+### usePassThrough<T>(theme, propsPt?)
+Main composable for PassThrough system.
+
+```ts
+const { pt, ptFor, debugPt } = usePassThrough(theme, props.pt)
+```
+
+**Returns:**
+- `pt(key)` - Get HTML attributes for v-bind (type-safe with defineTheme)
+- `ptFor(key)` - Extract nested pt for child components
+- `debugPt` - ComputedRef<PtSpec> for debugging
+
+### defineTheme(theme)
+Type helper for autocomplete and type safety.
+
+```ts
+const theme = defineTheme({
+  root: 'grid gap-2',
+  input: 'border px-3'
+})
+```
+
+### PtSpec Type
+```ts
+interface PtSpec {
+  [key: string]: string | Record<string, any> | PtSpec | undefined
+}
+```
+
+## Usage Patterns
+
+### Basic Component
+```vue
+<template>
+  <div v-bind="pt('root')">
+    <input v-bind="pt('input')" />
+  </div>
+</template>
+
+<script setup>
+const props = defineProps<{ pt?: PtSpec }>()
+const { pt } = usePassThrough({
+  root: 'grid gap-2',
+  input: 'border px-3'
+}, props.pt)
+</script>
+```
+
+### Parent Usage
+```vue
+<!-- Merge: attrs add to theme -->
+<MyInput pt:root="bg-white" pt:input="border-blue-500" />
+
+<!-- Replace: props override theme -->
+<MyInput :pt="{ root: 'flex', input: 'rounded-full' }" />
+
+<!-- Nested attrs -->
+<MyInput pt:input:id="my-id" pt:input:onClick="handler" />
+```
+
+## Merge Strategy
+
+**Core Rule:**
+- `pt:*` attrs = MERGE with theme
+- `:pt` props = REPLACE theme (for keys in props)
+
+```vue
+<!-- theme: { root: 'grid gap-2', input: 'border' } -->
+
+<!-- attrs: merges -->
+<MyInput pt:root="p-4" />
+<!-- → root: 'grid gap-2 p-4' -->
+
+<!-- props: replaces -->
+<MyInput :pt="{ root: 'flex' }" />
+<!-- → root: 'flex' (theme ignored) -->
+```
+
+## Advanced Features
+
+### Extend Pattern
+```ts
+{
+  input: 'border px-3',
+  inputError: {
+    extend: 'input',
+    class: 'border-red-500'
+  }
+}
+// inputError inherits from input
+```
+
+### Nested Components
+```ts
+const { pt, ptFor } = usePassThrough({
+  root: 'flex gap-2',
+  badge: {           // nested pt for child
+    root: 'px-2',
+    label: 'text-xs'
+  }
+})
+```
+
+```vue
+<Badge :pt="ptFor('badge')" />
+```
+
+## Key Points for LLMs
+
+1. **Strings are class shortcuts**: `root: "grid"` → `root: { class: "grid" }`
+2. **tailwind-merge**: Automatic Tailwind class conflict resolution
+3. **mergeProps**: Event handlers chain, don't override
+4. **Replace vs Merge**: `:pt` props replace, `pt:*` attrs merge
+5. **Type safety**: Use `defineTheme` for autocomplete
+6. **Reactivity**: propsPt accepts ref/computed
