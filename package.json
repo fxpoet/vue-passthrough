@@ -1,6 +1,6 @@
 {
   "name": "vue-passthrough",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "description": "Vue composable for styling nested elements inside Vue components from parent level",
   "type": "module",
   "main": "./dist/index.cjs",
