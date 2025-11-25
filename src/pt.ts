@@ -444,7 +444,7 @@ function ptAttrs(
  *   - Changes trigger automatic re-rendering
  *
  * @returns Object containing:
- *   - `pt(key)` - Function to get HTML attributes for v-bind (type-safe when using defineTheme)
+ *   - `ptPoint(key)` - Function to get HTML attributes for v-bind (type-safe when using defineTheme)
  *   - `ptFor(key)` - Function to extract nested pt for child components (type-safe when using defineTheme)
  *   - `debugPt` - Computed ref with final merged pt spec (for debugging)
  *
@@ -455,9 +455,9 @@ function ptAttrs(
  *   root: 'grid gap-2',
  *   input: 'border px-3'
  * })
- * const { pt } = usePassThrough(theme, props.pt)
- * pt('root')   // ✅ Autocomplete
- * pt('invalid') // ❌ TypeScript error
+ * const { ptPoint } = usePassThrough(theme, props.pt)
+ * ptPoint('root')   // ✅ Autocomplete
+ * ptPoint('invalid') // ❌ TypeScript error
  * ```
  *
  * @see {@link https://github.com/fxpoet/vue-passthrough#usage | Usage Guide}
@@ -494,13 +494,13 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
     });
 
     /**
-     * pt function: Return HTML attributes for use with v-bind
+     * ptPoint function: Return HTML attributes for use with v-bind
      *
      * Replace vs Merge strategy:
      * - If key exists in propsPt: ignore theme and use only propsPt (REPLACE)
      * - If key doesn't exist in propsPt: merge theme + attrsPt (MERGE)
      */
-    const pt = (key: ThemeKeys<T>): Record<string, any> => {
+    const ptPoint = (key: ThemeKeys<T>): Record<string, any> => {
         const propsValue = resolvedPropsPt.value;
 
         // If key exists in propsPt, ignore theme (REPLACE)
@@ -545,7 +545,7 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
     };
 
     return {
-        pt,
+        ptPoint,
         ptFor,
         debugPt
     };

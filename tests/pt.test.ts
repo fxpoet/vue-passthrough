@@ -420,12 +420,12 @@ describe('PassThrough System', () => {
             const attrHandler = vi.fn()
 
             const TestComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')" data-testid="root">test</div>',
+                template: '<div v-bind="ptPoint(\'root\')" data-testid="root">test</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: { class: 'border', onClick: themeHandler }
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -444,12 +444,12 @@ describe('PassThrough System', () => {
 
         it('applies tailwind-merge in usePassThrough with conflicting classes', () => {
             const TestComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')" data-testid="root">test</div>',
+                template: '<div v-bind="ptPoint(\'root\')" data-testid="root">test</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'px-2 py-4 bg-red-500'
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -480,10 +480,10 @@ describe('PassThrough System', () => {
                 },
                 template: '<div v-bind="ptFunc(\'root\')" data-testid="root">test</div>',
                 setup(props) {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'px-2 py-4'
                     }, computed(() => props.customPt))
-                    return { ptFunc: pt }
+                    return { ptFunc: ptPoint }
                 }
             })
 
@@ -511,12 +511,12 @@ describe('PassThrough System', () => {
     describe('attrs integration tests (pt:root, etc.)', () => {
         it('pt:root="class" format is merged with theme', () => {
             const TestComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')">test</div>',
+                template: '<div v-bind="ptPoint(\'root\')">test</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2'
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -534,12 +534,12 @@ describe('PassThrough System', () => {
 
         it('passes other HTML attributes in pt:root:id="value" format', () => {
             const TestComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')">test</div>',
+                template: '<div v-bind="ptPoint(\'root\')">test</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid'
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -559,12 +559,12 @@ describe('PassThrough System', () => {
             const onClick = vi.fn()
 
             const TestComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')">test</div>',
+                template: '<div v-bind="ptPoint(\'root\')">test</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'cursor-pointer'
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -582,12 +582,12 @@ describe('PassThrough System', () => {
             const dynamicClass = ref('bg-red-500')
 
             const ChildComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')" data-testid="child">child</div>',
+                template: '<div v-bind="ptPoint(\'root\')" data-testid="child">child</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2'
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -623,12 +623,12 @@ describe('PassThrough System', () => {
             const dynamicPt = ref<Record<string, any>>({ root: 'bg-red-500' })
 
             const ChildComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')" data-testid="child">child</div>',
+                template: '<div v-bind="ptPoint(\'root\')" data-testid="child">child</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2'
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -673,10 +673,10 @@ describe('PassThrough System', () => {
                 },
                 template: '<div v-bind="ptFunc(\'root\')" data-testid="child">child</div>',
                 setup(props) {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2'
                     }, computed(() => props.pt))
-                    return { ptFunc: pt }
+                    return { ptFunc: ptPoint }
                 }
             })
 
@@ -722,12 +722,12 @@ describe('PassThrough System', () => {
     describe('usePassThrough', () => {
         it('converts theme strings to { class: ... } objects', () => {
             const TestComponent = defineComponent({
-                template: '<div v-bind="pt(\'root\')">test</div>',
+                template: '<div v-bind="ptPoint(\'root\')">test</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2'
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -742,19 +742,19 @@ describe('PassThrough System', () => {
             const TestComponent = defineComponent({
                 template: `
           <div>
-            <div v-bind="pt('input')" data-testid="input">input</div>
-            <div v-bind="pt('inputInvalid')" data-testid="invalid">invalid</div>
+            <div v-bind="ptPoint('input')" data-testid="input">input</div>
+            <div v-bind="ptPoint('inputInvalid')" data-testid="invalid">invalid</div>
           </div>
         `,
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         input: 'border px-3',
                         inputInvalid: {
                             extend: 'input',
                             class: 'border-red-500'
                         }
                     })
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
@@ -782,10 +782,10 @@ describe('PassThrough System', () => {
                 },
                 template: '<div v-bind="ptFunc(\'root\')">test</div>',
                 setup(props) {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2'
                     }, computed(() => props.customPt))
-                    return { ptFunc: pt }
+                    return { ptFunc: ptPoint }
                 }
             })
 
@@ -807,10 +807,10 @@ describe('PassThrough System', () => {
             const TestComponent = defineComponent({
                 template: '<div v-bind="ptFunc(\'root\')">test</div>',
                 setup() {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2'
                     }, propsPt)
-                    return { ptFunc: pt }
+                    return { ptFunc: ptPoint }
                 }
             })
 
@@ -837,10 +837,10 @@ describe('PassThrough System', () => {
                 },
                 template: '<div v-bind="ptFunc(\'root\')">test</div>',
                 setup(props) {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'text-sm'  // theme
                     }, computed(() => props.customPt))
-                    return { ptFunc: pt }
+                    return { ptFunc: ptPoint }
                 }
             })
 
@@ -868,16 +868,16 @@ describe('PassThrough System', () => {
                 },
                 template: `
           <div>
-            <div v-bind="pt('root')" data-testid="root">root</div>
-            <div v-bind="pt('helper')" data-testid="helper">helper</div>
+            <div v-bind="ptPoint('root')" data-testid="root">root</div>
+            <div v-bind="ptPoint('helper')" data-testid="helper">helper</div>
           </div>
         `,
                 setup(props) {
-                    const { pt } = usePassThrough({
+                    const { ptPoint } = usePassThrough({
                         root: 'grid gap-2',
                         helper: 'text-xs mt-1'
                     }, computed(() => props.customPt))
-                    return { pt }
+                    return { ptPoint }
                 }
             })
 
