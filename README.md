@@ -10,7 +10,9 @@ A Vue composable that allows you to inject styles and attributes directly into a
 
 ## Features
 
+- **Lightweight**: ~4KB minified, zero dependencies (only peer deps: Vue, tailwind-merge)
 - **Flexible Style Customization**: Inject classes and HTML attributes into any component element from the outside
+- **Nested Component Support**: Pass styles through multiple component layers with `ptFor`
 - **Tailwind CSS Optimized**: Automatic class conflict resolution using `tailwind-merge`
 - **Full Reactivity**: Seamlessly integrated with Vue's reactivity system (supports ref/computed)
 - **TypeScript Support**: Full type safety with generic `usePassThrough<T>` and autocomplete
