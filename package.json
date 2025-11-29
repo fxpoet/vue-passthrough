@@ -1,6 +1,6 @@
 {
   "name": "vue-passthrough",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Vue composable for styling nested elements inside Vue components from parent level",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -25,7 +25,7 @@
     "build": "vite build && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "release": "npm run build && bumpp && npm publish"
+    "release": "bumpp && npm run build && npm publish"
   },
   "keywords": [
     "vue",
