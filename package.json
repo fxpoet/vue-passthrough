@@ -25,7 +25,8 @@
     "build": "vite build && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "release": "bumpp && npm run build && npm publish"
+    "release": "bumpp && npm run build && npm publish",
+    "versions": "npm view vue-passthrough versions"
   },
   "keywords": [
     "vue",
