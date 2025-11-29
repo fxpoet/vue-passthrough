@@ -119,6 +119,63 @@ function processTheme(theme: PtSpec): Record<string, Record<string, any>> {
 }
 
 // ============================================
+// Merge Strategy Helpers
+// ============================================
+
+interface MergeFlags {
+    $merge?: boolean;
+    $replace?: boolean;
+}
+
+/**
+ * Determine merge strategy from flags
+ *
+ * @param keyFlags - Flags on the specific key ({ $merge, $replace })
+ * @param topLevelFlags - Top-level flags from pt object
+ * @returns { shouldMerge, shouldReplace, warnBothSet }
+ */
+function getMergeStrategy(
+    keyFlags: MergeFlags,
+    topLevelFlags: MergeFlags = {}
+): { shouldMerge: boolean; shouldReplace: boolean; warnBothSet: boolean } {
+    const hasMerge = keyFlags.$merge === true;
+    const hasReplace = keyFlags.$replace === true;
+    const topLevelMerge = topLevelFlags.$merge === true;
+    const topLevelReplace = topLevelFlags.$replace === true;
+
+    // Key-level flags take priority over top-level
+    const shouldMerge = hasMerge || (topLevelMerge && !hasReplace);
+    const shouldReplace = hasReplace || (topLevelReplace && !hasMerge);
+
+    return {
+        shouldMerge,
+        shouldReplace,
+        warnBothSet: hasMerge && hasReplace
+    };
+}
+
+/**
+ * Apply tailwind-merge to class attribute if present
+ */
+function applyTailwindMerge(attrs: Record<string, any>): Record<string, any> {
+    if (attrs.class !== undefined && attrs.class !== null) {
+        return { ...attrs, class: twMerge(attrs.class as string) };
+    }
+    return attrs;
+}
+
+/**
+ * Merge base attributes with additional attributes using mergeProps + tailwind-merge
+ */
+function mergeAttrs(
+    base: Record<string, any>,
+    additional: Record<string, any>
+): Record<string, any> {
+    if (isEmpty(additional)) return base;
+    return applyTailwindMerge(mergeProps(base, additional));
+}
+
+// ============================================
 // Core Functions
 // ============================================
 
@@ -427,47 +484,44 @@ function ptAttrs(
  * The PassThrough system allows deep customization of component styles by merging
  * styles from three sources with intelligent replace vs merge strategies.
  *
- * **Merge Sources:**
+ * **Merge Sources (priority order):**
  * 1. `theme` - Component default styles (lowest priority)
- * 2. `attrs` - Passed from parent as `pt:root="..."` format (middle priority)
+ * 2. `attrs` - Passed from parent as `pt:root="..."` format (middle priority, always MERGE)
  * 3. `propsPt` - Passed from parent as `:pt="{ root: '...' }"` format (highest priority)
  *
  * **Replace vs Merge Strategy:**
- * - **Replace (props.pt)**: When a key exists in `props.pt`, it completely replaces
- *   the theme for that key. Use for complete style overrides.
- * - **Merge (attrs)**: When using `pt:*` attributes, they merge additively with the
- *   theme. Use for extending existing styles.
+ * - **Replace (default for props.pt)**: When a key exists in `props.pt`, theme is ignored
+ * - **Merge (attrs or `$merge: true`)**: Styles are combined with tailwind-merge
+ * - Use `$merge: true` on a key to merge with theme instead of replacing
+ * - Use `$replace: true` for explicit replace (same as default, clearer intent)
+ * - `$merge` cascades through `ptFor` to child components (Solution A)
  *
- * @param theme - Default theme configuration (flat structure)
+ * @param theme - Default theme configuration
  *   - Strings are automatically converted to `{ class: "..." }`
  *   - Supports `extend` attribute for style inheritance
+ *   - Supports `$merge: true` for nested pt to cascade to children
  *   - Processed once and cached for performance
- *   - Use with `defineTheme()` for type-safe keys and autocomplete
  * @param propsPt - Required pt from props (MaybeRef for full reactivity)
  *   - Always pass props.pt, even if it may be undefined
  *   - Supports Vue refs and computed values
- *   - Changes trigger automatic re-rendering
  *   - Warning is shown if this parameter is omitted
  *
  * @returns Object containing:
- *   - `ptMark(key)` - Function to get HTML attributes for v-bind (type-safe when using defineTheme)
- *   - `ptFor(key)` - Function to extract nested pt for child components (type-safe when using defineTheme)
+ *   - `ptMark(key)` - Get HTML attributes for v-bind
+ *   - `ptFor(key)` - Extract nested pt for child components (with $merge cascade)
  *   - `debugPt` - Computed ref with final merged pt spec (for debugging)
  *
  * @example
  * ```ts
- * // Type-safe usage with defineTheme
  * const theme = defineTheme({
  *   root: 'grid gap-2',
- *   input: 'border px-3'
+ *   input: 'border px-3',
+ *   badge: { $merge: true, root: 'px-2' }  // Cascades $merge to Badge
  * })
- * const { ptMark } = usePassThrough(theme, props.pt)
- * ptMark('root')   // ✅ Autocomplete
- * ptMark('invalid') // ❌ TypeScript error
+ * const { ptMark, ptFor } = usePassThrough(theme, props.pt)
  * ```
  *
- * @see {@link https://github.com/fxpoet/vue-passthrough#usage | Usage Guide}
- * @see {@link https://github.com/fxpoet/vue-passthrough#api | API Reference}
+ * @see {@link https://github.com/fxpoet/vue-passthrough | Documentation}
  */
 export function usePassThrough<T extends PtSpec = PtSpec>(
     theme: T,
@@ -507,189 +561,107 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
     });
 
     /**
-     * ptMark function: Return HTML attributes for use with v-bind
+     * ptMark: Return HTML attributes for use with v-bind
      *
      * **Strategy:**
      * - Default: REPLACE (if key exists in props.pt, theme is ignored)
-     * - With `$merge: true` on key: MERGE (theme + attrs + props.pt)
-     * - With `$merge: true` at pt top-level: MERGE applies to ALL keys (for ptFor chaining)
-     * - With `$replace: true`: REPLACE (explicit, same as default)
-     * - If both `$merge` and `$replace` are set, warns and uses `$merge`
+     * - With `$merge: true`: MERGE (theme + attrs + props.pt)
      * - Key-level flags take priority over top-level flags
      * - If key doesn't exist in props.pt: merge theme + attrs
-     *
-     * @example
-     * // REPLACE (default or explicit)
-     * <MyInput :pt="{ root: 'flex gap-4' }" />
-     * <MyInput :pt="{ root: { $replace: true, class: 'flex gap-4' } }" />
-     *
-     * @example
-     * // MERGE - theme.root is preserved and merged
-     * <MyInput :pt="{ root: { $merge: true, class: 'bg-red-500' } }" />
-     *
-     * @example
-     * // Top-level $merge - all keys use merge strategy (for ptFor chaining)
-     * <Badge :pt="{ $merge: true, root: 'border-1', wrapper: 'px-10' }" />
      */
     const ptMark = (key: ThemeKeys<T>): Record<string, any> => {
         const propsValue = resolvedPropsPt.value;
+        const baseAttrs = normalizedTheme[key] || {};
 
-        // Check for top-level $merge/$replace flags (applies to all keys)
-        const topLevelMerge = propsValue.$merge === true;
-        const topLevelReplace = propsValue.$replace === true;
-
-        // If key exists in propsPt
-        if (key in propsValue) {
-            const ptValue = propsValue[key];
-
-            if (isObject(ptValue)) {
-                const hasMerge = ptValue.$merge === true;
-                const hasReplace = ptValue.$replace === true;
-
-                // Warn if both flags are set (key-level)
-                if (hasMerge && hasReplace) {
-                    warn(`Both $merge and $replace are set for "${key}". Using $merge.`, { key });
-                }
-
-                // Key-level flags take priority over top-level flags
-                const shouldMerge = hasMerge || (topLevelMerge && !hasReplace);
-                const shouldReplace = hasReplace || (topLevelReplace && !hasMerge);
-
-                // $merge takes priority
-                if (shouldMerge) {
-                    // MERGE strategy: theme + attrs + props.pt
-                    const { $merge, $replace, ...rest } = ptValue as Record<string, any>;
-                    const baseAttrs = normalizedTheme[key] || {};
-
-                    // First merge theme with attrs
-                    let result = ptAttrs(key, baseAttrs, attrsPt.value);
-
-                    // Then merge with props.pt (without $merge/$replace)
-                    const normalized = normalizeValue(rest);
-                    if (!isEmpty(normalized)) {
-                        result = mergeProps(result, normalized);
-                        if (result.class !== undefined && result.class !== null) {
-                            result.class = twMerge(result.class as string);
-                        }
-                    }
-
-                    return result;
-                }
-
-                // $replace: explicit replace (remove flag from output)
-                if (shouldReplace) {
-                    const { $replace, ...rest } = ptValue as Record<string, any>;
-                    return normalizeValue(rest);
-                }
-            } else if (topLevelMerge) {
-                // String/primitive value with top-level $merge - use merge strategy
-                const baseAttrs = normalizedTheme[key] || {};
-                let result = ptAttrs(key, baseAttrs, attrsPt.value);
-
-                const normalized = normalizeValue(ptValue);
-                if (!isEmpty(normalized)) {
-                    result = mergeProps(result, normalized);
-                    if (result.class !== undefined && result.class !== null) {
-                        result.class = twMerge(result.class as string);
-                    }
-                }
-
-                return result;
-            }
-
-            // REPLACE strategy (default): ignore theme
-            return normalizeValue(ptValue);
+        // Key not in props → merge theme + attrs
+        if (!(key in propsValue)) {
+            return ptAttrs(key, baseAttrs, attrsPt.value);
         }
 
-        // If key doesn't exist in propsPt, merge theme + attrsPt (MERGE)
-        const baseAttrs = normalizedTheme[key] || {};
-        return ptAttrs(key, baseAttrs, attrsPt.value);
+        const ptValue = propsValue[key];
+        const topLevelFlags = { $merge: propsValue.$merge, $replace: propsValue.$replace };
+
+        // Object value: check for merge flags
+        if (isObject(ptValue)) {
+            const { shouldMerge, shouldReplace, warnBothSet } = getMergeStrategy(ptValue, topLevelFlags);
+
+            if (warnBothSet) {
+                warn(`Both $merge and $replace are set for "${key}". Using $merge.`, { key });
+            }
+
+            if (shouldMerge) {
+                const { $merge, $replace, ...rest } = ptValue as Record<string, any>;
+                const themeWithAttrs = ptAttrs(key, baseAttrs, attrsPt.value);
+                return mergeAttrs(themeWithAttrs, normalizeValue(rest));
+            }
+
+            if (shouldReplace) {
+                const { $replace, ...rest } = ptValue as Record<string, any>;
+                return normalizeValue(rest);
+            }
+        }
+        // Primitive value with top-level $merge
+        else if (topLevelFlags.$merge) {
+            const themeWithAttrs = ptAttrs(key, baseAttrs, attrsPt.value);
+            return mergeAttrs(themeWithAttrs, normalizeValue(ptValue));
+        }
+
+        // REPLACE (default): ignore theme
+        return normalizeValue(ptValue);
     };
 
     /**
-     * Helper to pass pt to child components
-     *
-     * Extract only nested objects without class attribute and pass to child components.
+     * ptFor: Extract nested pt for child components
      *
      * **Strategy:**
      * - Default: REPLACE (if key exists in props.pt, theme is ignored)
-     * - With `$merge: true`: MERGE (theme → attrs → props.pt)
-     * - With `$replace: true`: REPLACE (explicit, same as default)
-     * - If both `$merge` and `$replace` are set, warns and uses `$merge`
-     * - `$merge` **cascades**: If props has $merge, the result also has $merge
-     *   so child components will merge with their themes too
-     *
-     * @example
-     * // REPLACE (default or explicit)
-     * <MyInput :pt="{ badge: { wrapper: 'text-red' } }" />
-     * <MyInput :pt="{ badge: { $replace: true, wrapper: 'text-red' } }" />
-     *
-     * @example
-     * // MERGE - theme.badge is preserved and merged, $merge cascades to child
-     * <MyInput :pt="{ badge: { $merge: true, wrapper: 'text-red' } }" />
+     * - With `$merge: true`: MERGE (theme → attrs → props.pt), cascades to child
+     * - With `$replace: true`: REPLACE (explicit)
+     * - If key doesn't exist in props.pt: use theme + attrs
      */
     const ptFor = (componentKey: ThemeKeys<T>): PtSpec => {
         const propsValue = resolvedPropsPt.value;
+        const themePt = extractNestedPt(normalizedTheme[componentKey]);
+        const attrsPtNested = extractNestedPt(attrsPt.value[componentKey]);
 
-        // If key exists in props.pt
-        if (componentKey in propsValue) {
-            const propsNested = extractNestedPt(propsValue[componentKey]);
-
-            if (propsNested) {
-                const hasMerge = propsNested.$merge === true;
-                const hasReplace = propsNested.$replace === true;
-
-                // Warn if both flags are set
-                if (hasMerge && hasReplace) {
-                    warn(`Both $merge and $replace are set for "${componentKey}". Using $merge.`, { key: componentKey });
-                }
-
-                // $merge takes priority
-                if (hasMerge) {
-                    // MERGE strategy: theme → attrs → props.pt
-                    const { $merge, $replace, ...rest } = propsNested;
-
-                    let result = extractNestedPt(normalizedTheme[componentKey]);
-
-                    const attrsNested = extractNestedPt(attrsPt.value[componentKey]);
-                    if (!isEmpty(attrsNested)) {
-                        result = mergePt(result, attrsNested);
-                    }
-
-                    if (!isEmpty(rest)) {
-                        result = mergePt(result, rest as PtSpec);
-                    }
-
-                    // Cascade $merge flag to child component (Solution A)
-                    // If props had $merge, ensure result also has it so child also merges
-                    if (!result.$merge) {
-                        result = { $merge: true, ...result };
-                    }
-
-                    return result;
-                }
-
-                // $replace: explicit replace (remove flag from output)
-                if (hasReplace) {
-                    const { $replace, ...rest } = propsNested;
-                    return rest as PtSpec;
-                }
-            }
-
-            // REPLACE strategy (default): ignore theme
-            return propsNested;
+        // Key not in props → use theme + attrs
+        if (!(componentKey in propsValue)) {
+            if (!isEmpty(attrsPtNested)) return attrsPtNested;
+            return themePt;
         }
 
-        // If key doesn't exist in props.pt, use theme + attrs
-        const attrsValue = attrsPt.value[componentKey];
-        if (attrsValue) {
-            const nested = extractNestedPt(attrsValue);
-            if (!isEmpty(nested)) {
-                return nested;
-            }
+        const propsNested = extractNestedPt(propsValue[componentKey]);
+        if (!propsNested) return propsNested;
+
+        const { shouldMerge, shouldReplace, warnBothSet } = getMergeStrategy(propsNested);
+
+        if (warnBothSet) {
+            warn(`Both $merge and $replace are set for "${componentKey}". Using $merge.`, { key: componentKey });
         }
 
-        return extractNestedPt(normalizedTheme[componentKey]);
+        if (shouldMerge) {
+            const { $merge, $replace, ...rest } = propsNested;
+
+            // MERGE: theme → attrs → props.pt
+            let result = themePt;
+            if (!isEmpty(attrsPtNested)) {
+                result = mergePt(result, attrsPtNested);
+            }
+            if (!isEmpty(rest)) {
+                result = mergePt(result, rest as PtSpec);
+            }
+
+            // Cascade $merge to child (Solution A)
+            return result.$merge ? result : { $merge: true, ...result };
+        }
+
+        if (shouldReplace) {
+            const { $replace, ...rest } = propsNested;
+            return rest as PtSpec;
+        }
+
+        // REPLACE (default): ignore theme
+        return propsNested;
     };
 
     return {
@@ -710,7 +682,7 @@ export const usePt = usePassThrough;
  * Define a strongly-typed theme with improved type inference
  *
  * This helper function provides better TypeScript support by preserving
- * the exact structure of your theme, enabling autocomplete for pt() keys
+ * the exact structure of your theme, enabling autocomplete for ptMark/ptFor keys
  * and compile-time validation of theme references.
  *
  * @param theme - Theme configuration object
@@ -724,9 +696,9 @@ export const usePt = usePassThrough;
  *   helper: 'text-xs text-gray-500'
  * })
  *
- * const { pt } = usePassThrough(myTheme)
- * pt('root')   // ✅ Autocomplete suggests: 'root' | 'input' | 'helper'
- * pt('invalid') // ❌ TypeScript error: Argument not assignable
+ * const { ptMark } = usePassThrough(myTheme, props.pt)
+ * ptMark('root')    // ✅ Autocomplete suggests: 'root' | 'input' | 'helper'
+ * ptMark('invalid') // ❌ TypeScript error: Argument not assignable
  * ```
  *
  * @example With extend
@@ -740,19 +712,19 @@ export const usePt = usePassThrough;
  * })
  * ```
  *
- * @example Nested components
+ * @example Nested components (with $merge for cascade)
  * ```ts
  * const theme = defineTheme({
  *   root: 'flex gap-4',
  *   badge: {
+ *     $merge: true,  // Cascades to child component
  *     root: 'px-2 py-1 rounded',
- *     label: 'text-xs font-medium',
- *     icon: 'w-4 h-4'
+ *     label: 'text-xs font-medium'
  *   }
  * })
  *
- * const { pt, ptFor } = usePassThrough(theme)
- * const badgePt = ptFor('badge') // Typed nested pt spec
+ * const { ptMark, ptFor } = usePassThrough(theme, props.pt)
+ * const badgePt = ptFor('badge') // Typed nested pt spec with $merge cascaded
  * ```
  */
 export function defineTheme<T extends PtSpec>(theme: T): T {
