@@ -616,6 +616,34 @@ const { ptMark } = usePassThrough(theme, props.pt)
 </script>
 ```
 
+## Tailwind CSS v4 Tree-Shaking Issue
+
+When using vue-passthrough with Tailwind CSS, classes defined in `<script setup>` (like in theme objects) may not be detected by Tailwind's content scanner, causing them to be tree-shaken from the final CSS.
+
+**Problem:**
+```vue
+<script setup>
+// These classes are in JS code, not in template
+// Tailwind may not detect them
+const { ptMark } = usePassThrough({
+  root: 'bg-red-500 text-white',  // ❌ May be tree-shaken
+  input: 'border-blue-500'         // ❌ May be tree-shaken
+}, props.pt)
+</script>
+```
+
+**Solution (Tailwind CSS v4):**
+
+Use `@source inline()` to explicitly include the classes:
+
+```css
+/* main.css */
+@import "tailwindcss";
+@source inline("bg-red-500 text-white border-blue-500 hover:bg-red-600");
+```
+
+This ensures the specified classes are always generated in the final CSS, regardless of where they're defined in your code.
+
 ## Requirements
 - Vue 3.2+
 
