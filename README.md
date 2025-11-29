@@ -17,6 +17,12 @@ A Vue composable that allows you to inject styles and attributes directly into a
 - **Extend Pattern**: Style inheritance to reduce duplication
 - **3-Tier Merging**: Automatic merging with priority: props.pt > attrs > theme
 
+## Sponsors
+
+🥲 Currently in a state of extreme poverty
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/sabzil)
+
 ## Installation
 
 ```bash
