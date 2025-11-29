@@ -12,19 +12,9 @@ const { ptMark, ptFor, debugPt } = usePassThrough(theme, props.pt)
 ```
 
 **Returns:**
-- `ptMark(key)` - Get HTML attributes for v-bind (type-safe with defineTheme)
+- `ptMark(key)` - Get HTML attributes for v-bind (type-safe)
 - `ptFor(key)` - Extract nested pt for child components
 - `debugPt` - ComputedRef<PtSpec> for debugging
-
-### defineTheme(theme)
-Type helper for autocomplete and type safety.
-
-```ts
-const theme = defineTheme({
-  root: 'grid gap-2',
-  input: 'border px-3'
-})
-```
 
 ### PtSpec Type
 ```ts
@@ -161,6 +151,6 @@ Badge theme → MyInput badge → Page pt.badge
 4. **Replace vs Merge**: `:pt` props replace, `pt:*` attrs merge
 5. **$merge/$replace flags**: Use `$merge: true` to merge, `$replace: true` for explicit replace. If both set, `$merge` wins with warning
 6. **Top-level $merge**: Applies merge strategy to ALL keys in pt object (enables ptFor chaining)
-7. **Type safety**: Use `defineTheme` for autocomplete
+7. **Type safety**: TypeScript infers theme keys automatically
 8. **Reactivity**: propsPt accepts ref/computed
 9. **propsPt required**: Always pass props.pt to usePassThrough, even if undefined

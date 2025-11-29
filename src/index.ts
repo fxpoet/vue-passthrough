@@ -1,7 +1,6 @@
 export {
     usePassThrough,
     usePt,
-    defineTheme,
     attrsToPt,
     mergePt,
     type PtSpec,

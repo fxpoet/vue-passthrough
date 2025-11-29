@@ -513,11 +513,11 @@ function ptAttrs(
  *
  * @example
  * ```ts
- * const theme = defineTheme({
+ * const theme = {
  *   root: 'grid gap-2',
  *   input: 'border px-3',
  *   badge: { $merge: true, root: 'px-2' }  // Cascades $merge to Badge
- * })
+ * }
  * const { ptMark, ptFor } = usePassThrough(theme, props.pt)
  * ```
  *
@@ -679,76 +679,17 @@ export const usePt = usePassThrough;
 // ============================================
 
 /**
- * Define a strongly-typed theme with improved type inference
- *
- * This helper function provides better TypeScript support by preserving
- * the exact structure of your theme, enabling autocomplete for ptMark/ptFor keys
- * and compile-time validation of theme references.
- *
- * @param theme - Theme configuration object
- * @returns The same theme object with preserved type information
- *
- * @example Basic usage
- * ```ts
- * const myTheme = defineTheme({
- *   root: 'grid gap-2',
- *   input: 'border px-3',
- *   helper: 'text-xs text-gray-500'
- * })
- *
- * const { ptMark } = usePassThrough(myTheme, props.pt)
- * ptMark('root')    // ✅ Autocomplete suggests: 'root' | 'input' | 'helper'
- * ptMark('invalid') // ❌ TypeScript error: Argument not assignable
- * ```
- *
- * @example With extend
- * ```ts
- * const theme = defineTheme({
- *   input: 'border rounded px-3 py-2',
- *   inputError: {
- *     extend: 'input',
- *     class: 'border-red-500'
- *   }
- * })
- * ```
- *
- * @example Nested components (with $merge for cascade)
- * ```ts
- * const theme = defineTheme({
- *   root: 'flex gap-4',
- *   badge: {
- *     $merge: true,  // Cascades to child component
- *     root: 'px-2 py-1 rounded',
- *     label: 'text-xs font-medium'
- *   }
- * })
- *
- * const { ptMark, ptFor } = usePassThrough(theme, props.pt)
- * const badgePt = ptFor('badge') // Typed nested pt spec with $merge cascaded
- * ```
- */
-export function defineTheme<T extends PtSpec>(theme: T): T {
-    return theme;
-}
-
-/**
  * Type helper to extract theme keys for better type checking
- *
- * Useful when you need to work with theme keys in a type-safe manner.
  *
  * @example
  * ```ts
- * const theme = defineTheme({
+ * const theme = {
  *   root: 'grid',
  *   input: 'border',
  *   helper: 'text-xs'
- * })
+ * }
  *
  * type MyThemeKeys = ThemeKeys<typeof theme> // 'root' | 'input' | 'helper'
- *
- * function customPtFunction(key: MyThemeKeys) {
- *   // key is now type-safe
- * }
  * ```
  */
 export type ThemeKeys<T extends PtSpec> = keyof T & string;

@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import { usePassThrough, type PtSpec, defineTheme } from 'vue-passthrough'
+import { usePassThrough, type PtSpec } from 'vue-passthrough'
 
 interface Props {
     label?: string
@@ -27,10 +27,10 @@ const variantClasses: Record<string, string> = {
     warning: 'bg-yellow-100 text-yellow-800'
 }
 //root: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses[props.variant]}`,
-const theme = defineTheme({
+const theme = {
     root: `text-red-500`,
     wrapper: 'px-3 py-2 text-xs'
-})
+}
 const { ptMark } = usePassThrough(theme, props.pt)
 </script>
 
