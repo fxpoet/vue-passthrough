@@ -17,14 +17,15 @@
     "dist",
     "src",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "LLM.txt"
   ],
   "scripts": {
     "dev": "vite --config vite.config.playground.ts",
     "build": "vite build && tsc --project tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "release": "bumpp && npm publish"
+    "release": "npm run build && bumpp && npm publish"
   },
   "keywords": [
     "vue",
