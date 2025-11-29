@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import { usePassThrough, type PtSpec } from 'vue-passthrough'
-import Badge from './MyBedge.vue'
+import Badge from './MyBadge.vue'
 
 interface Props {
     label?: string
