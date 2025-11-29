@@ -26,10 +26,11 @@ const variantClasses: Record<string, string> = {
     danger: 'bg-red-100 text-red-800',
     warning: 'bg-yellow-100 text-yellow-800'
 }
-
+//root: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses[props.variant]}`,
 const theme = defineTheme({
-    root: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses[props.variant]}`,
+    root: `text-red-500`,
     wrapper: 'px-3 py-2 text-xs'
 })
 const { ptMark } = usePassThrough(theme, props.pt)
 </script>
+

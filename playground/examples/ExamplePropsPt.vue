@@ -15,6 +15,7 @@
         helper: 'text-sm text-purple-600 font-medium',
         badge: {
           $merge: true,
+          root: 'bg-red-500',
           wrapper: 'text-lg text-red-500'
         }
       }"

@@ -45,6 +45,7 @@ const { ptMark, ptFor } = usePassThrough({
     helper: 'text-xs text-gray-500',
     badge: {
         $merge: true,
+        root: 'border-1 border-pink-500',
         wrapper: 'px-10'
     }
 }, props.pt)

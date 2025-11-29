@@ -511,9 +511,11 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
      *
      * **Strategy:**
      * - Default: REPLACE (if key exists in props.pt, theme is ignored)
-     * - With `$merge: true`: MERGE (theme + attrs + props.pt)
+     * - With `$merge: true` on key: MERGE (theme + attrs + props.pt)
+     * - With `$merge: true` at pt top-level: MERGE applies to ALL keys (for ptFor chaining)
      * - With `$replace: true`: REPLACE (explicit, same as default)
      * - If both `$merge` and `$replace` are set, warns and uses `$merge`
+     * - Key-level flags take priority over top-level flags
      * - If key doesn't exist in props.pt: merge theme + attrs
      *
      * @example
@@ -524,9 +526,17 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
      * @example
      * // MERGE - theme.root is preserved and merged
      * <MyInput :pt="{ root: { $merge: true, class: 'bg-red-500' } }" />
+     *
+     * @example
+     * // Top-level $merge - all keys use merge strategy (for ptFor chaining)
+     * <Badge :pt="{ $merge: true, root: 'border-1', wrapper: 'px-10' }" />
      */
     const ptMark = (key: ThemeKeys<T>): Record<string, any> => {
         const propsValue = resolvedPropsPt.value;
+
+        // Check for top-level $merge/$replace flags (applies to all keys)
+        const topLevelMerge = propsValue.$merge === true;
+        const topLevelReplace = propsValue.$replace === true;
 
         // If key exists in propsPt
         if (key in propsValue) {
@@ -536,13 +546,17 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
                 const hasMerge = ptValue.$merge === true;
                 const hasReplace = ptValue.$replace === true;
 
-                // Warn if both flags are set
+                // Warn if both flags are set (key-level)
                 if (hasMerge && hasReplace) {
                     warn(`Both $merge and $replace are set for "${key}". Using $merge.`, { key });
                 }
 
+                // Key-level flags take priority over top-level flags
+                const shouldMerge = hasMerge || (topLevelMerge && !hasReplace);
+                const shouldReplace = hasReplace || (topLevelReplace && !hasMerge);
+
                 // $merge takes priority
-                if (hasMerge) {
+                if (shouldMerge) {
                     // MERGE strategy: theme + attrs + props.pt
                     const { $merge, $replace, ...rest } = ptValue as Record<string, any>;
                     const baseAttrs = normalizedTheme[key] || {};
@@ -563,10 +577,24 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
                 }
 
                 // $replace: explicit replace (remove flag from output)
-                if (hasReplace) {
+                if (shouldReplace) {
                     const { $replace, ...rest } = ptValue as Record<string, any>;
                     return normalizeValue(rest);
                 }
+            } else if (topLevelMerge) {
+                // String/primitive value with top-level $merge - use merge strategy
+                const baseAttrs = normalizedTheme[key] || {};
+                let result = ptAttrs(key, baseAttrs, attrsPt.value);
+
+                const normalized = normalizeValue(ptValue);
+                if (!isEmpty(normalized)) {
+                    result = mergeProps(result, normalized);
+                    if (result.class !== undefined && result.class !== null) {
+                        result.class = twMerge(result.class as string);
+                    }
+                }
+
+                return result;
             }
 
             // REPLACE strategy (default): ignore theme
@@ -588,6 +616,8 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
      * - With `$merge: true`: MERGE (theme → attrs → props.pt)
      * - With `$replace: true`: REPLACE (explicit, same as default)
      * - If both `$merge` and `$replace` are set, warns and uses `$merge`
+     * - `$merge` **cascades**: If props has $merge, the result also has $merge
+     *   so child components will merge with their themes too
      *
      * @example
      * // REPLACE (default or explicit)
@@ -595,7 +625,7 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
      * <MyInput :pt="{ badge: { $replace: true, wrapper: 'text-red' } }" />
      *
      * @example
-     * // MERGE - theme.badge is preserved and merged
+     * // MERGE - theme.badge is preserved and merged, $merge cascades to child
      * <MyInput :pt="{ badge: { $merge: true, wrapper: 'text-red' } }" />
      */
     const ptFor = (componentKey: ThemeKeys<T>): PtSpec => {
@@ -628,6 +658,12 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
 
                     if (!isEmpty(rest)) {
                         result = mergePt(result, rest as PtSpec);
+                    }
+
+                    // Cascade $merge flag to child component (Solution A)
+                    // If props had $merge, ensure result also has it so child also merges
+                    if (!result.$merge) {
+                        result = { $merge: true, ...result };
                     }
 
                     return result;

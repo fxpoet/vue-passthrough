@@ -131,6 +131,28 @@ By default, `:pt` props use REPLACE strategy. Use flags for explicit control:
 <MyButton :pt="{ badge: { $merge: true, label: 'text-red' } }" />       <!-- MERGE -->
 ```
 
+### Top-level $merge (for ptFor chaining)
+When `$merge` is at pt object's top level, it applies to ALL keys:
+```ts
+// ptFor returns: { $merge: true, root: 'border-1', wrapper: 'px-10' }
+// Child's ptMark('root') merges: theme.root + 'border-1'
+// Child's ptMark('wrapper') merges: theme.wrapper + 'px-10'
+```
+
+**$merge cascades to children**: If props has `$merge: true`, ptFor automatically adds it to the result, so child components also merge with their themes.
+```ts
+// Page: { badge: { $merge: true, root: 'bg-red' } }
+// MyInput theme.badge: { root: 'border-1' }  (no $merge)
+// ptFor result: { $merge: true, root: 'border-1 bg-red' }  ($merge added!)
+// MyBadge: merges with its theme because $merge cascaded
+```
+
+Override order for 3-level nesting:
+```
+Badge theme → MyInput badge → Page pt.badge
+(base)        (middle)        (final)
+```
+
 ## Key Points for LLMs
 
 1. **Strings are class shortcuts**: `root: "grid"` → `root: { class: "grid" }`
@@ -138,6 +160,7 @@ By default, `:pt` props use REPLACE strategy. Use flags for explicit control:
 3. **mergeProps**: Event handlers chain, don't override
 4. **Replace vs Merge**: `:pt` props replace, `pt:*` attrs merge
 5. **$merge/$replace flags**: Use `$merge: true` to merge, `$replace: true` for explicit replace. If both set, `$merge` wins with warning
-6. **Type safety**: Use `defineTheme` for autocomplete
-7. **Reactivity**: propsPt accepts ref/computed
-8. **propsPt required**: Always pass props.pt to usePassThrough, even if undefined
+6. **Top-level $merge**: Applies merge strategy to ALL keys in pt object (enables ptFor chaining)
+7. **Type safety**: Use `defineTheme` for autocomplete
+8. **Reactivity**: propsPt accepts ref/computed
+9. **propsPt required**: Always pass props.pt to usePassThrough, even if undefined

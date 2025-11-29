@@ -1337,6 +1337,287 @@ describe('PassThrough System', () => {
                 consoleWarnSpy.mockRestore()
             })
         })
+
+        describe('top-level $merge flag (for ptFor chaining)', () => {
+            it('top-level $merge applies merge strategy to all string keys', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="root"><span v-bind="ptFunc(\'wrapper\')" data-testid="wrapper">test</span></div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'text-red-500',
+                            wrapper: 'px-3 py-2 text-xs'
+                        }, computed(() => props.customPt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                // Simulates ptFor output: { $merge: true, root: 'border-1', wrapper: 'px-10' }
+                const wrapper = mount(TestComponent, {
+                    props: {
+                        customPt: {
+                            $merge: true,
+                            root: 'border-1 border-pink-500',
+                            wrapper: 'px-10'
+                        }
+                    }
+                })
+
+                const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+                const wrapperEl = wrapper.find('[data-testid="wrapper"]').element as HTMLElement
+
+                // root: theme 'text-red-500' + props 'border-1 border-pink-500'
+                expect(rootEl.className).toContain('text-red-500')
+                expect(rootEl.className).toContain('border-1')
+                expect(rootEl.className).toContain('border-pink-500')
+
+                // wrapper: theme 'px-3 py-2 text-xs' + props 'px-10' (px-10 wins over px-3)
+                expect(wrapperEl.className).toContain('px-10')
+                expect(wrapperEl.className).toContain('py-2')
+                expect(wrapperEl.className).toContain('text-xs')
+                expect(wrapperEl.className).not.toContain('px-3')
+            })
+
+            it('key-level $replace overrides top-level $merge', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="root"><span v-bind="ptFunc(\'wrapper\')" data-testid="wrapper">test</span></div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'text-red-500 px-2',
+                            wrapper: 'px-3 py-2'
+                        }, computed(() => props.customPt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                const wrapper = mount(TestComponent, {
+                    props: {
+                        customPt: {
+                            $merge: true,  // top-level merge
+                            root: 'border-1',  // will merge
+                            wrapper: { $replace: true, class: 'px-10' }  // key-level replace overrides
+                        }
+                    }
+                })
+
+                const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+                const wrapperEl = wrapper.find('[data-testid="wrapper"]').element as HTMLElement
+
+                // root: merged (theme + props)
+                expect(rootEl.className).toContain('text-red-500')
+                expect(rootEl.className).toContain('border-1')
+
+                // wrapper: replaced (key-level $replace wins)
+                expect(wrapperEl.className).toBe('px-10')
+                expect(wrapperEl.className).not.toContain('py-2')
+            })
+
+            it('simulates 3-level nesting: Page → MyInput → MyBadge', () => {
+                // MyBadge component (innermost)
+                const MyBadge = defineComponent({
+                    props: {
+                        pt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="badge-root"><span v-bind="ptFunc(\'wrapper\')" data-testid="badge-wrapper">badge</span></div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'text-red-500',
+                            wrapper: 'px-3 py-2 text-xs'
+                        }, computed(() => props.pt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                // MyInput component (middle)
+                const MyInput = defineComponent({
+                    components: { MyBadge },
+                    props: {
+                        pt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div><MyBadge :pt="badgePt" /></div>',
+                    setup(props) {
+                        const { ptFor } = usePassThrough({
+                            badge: {
+                                $merge: true,
+                                root: 'border-1 border-pink-500',
+                                wrapper: 'px-10'
+                            }
+                        }, computed(() => props.pt))
+                        return { badgePt: computed(() => ptFor('badge')) }
+                    }
+                })
+
+                // Page component (outermost) - passes pt to MyInput
+                const wrapper = mount(MyInput, {
+                    props: {
+                        pt: {
+                            badge: {
+                                $merge: true,
+                                root: 'bg-red-500'
+                            }
+                        }
+                    }
+                })
+
+                const badgeRoot = wrapper.find('[data-testid="badge-root"]').element as HTMLElement
+                const badgeWrapper = wrapper.find('[data-testid="badge-wrapper"]').element as HTMLElement
+
+                // root: MyBadge theme + MyInput badge + Page badge
+                // = 'text-red-500' + 'border-1 border-pink-500' + 'bg-red-500'
+                expect(badgeRoot.className).toContain('text-red-500')
+                expect(badgeRoot.className).toContain('border-1')
+                expect(badgeRoot.className).toContain('border-pink-500')
+                expect(badgeRoot.className).toContain('bg-red-500')
+
+                // wrapper: MyBadge theme + MyInput badge (Page didn't specify wrapper)
+                // = 'px-3 py-2 text-xs' + 'px-10' → 'px-10 py-2 text-xs' (tailwind-merge)
+                expect(badgeWrapper.className).toContain('px-10')
+                expect(badgeWrapper.className).toContain('py-2')
+                expect(badgeWrapper.className).toContain('text-xs')
+                expect(badgeWrapper.className).not.toContain('px-3')
+            })
+
+            it('$merge cascades from props even when theme has no $merge (Solution A)', () => {
+                // MyBadge component (innermost)
+                const MyBadge = defineComponent({
+                    props: {
+                        pt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="badge-root"><span v-bind="ptFunc(\'wrapper\')" data-testid="badge-wrapper">badge</span></div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'text-red-500',
+                            wrapper: 'px-3 py-2 text-xs'
+                        }, computed(() => props.pt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                // MyInput component (middle) - theme has NO $merge
+                const MyInput = defineComponent({
+                    components: { MyBadge },
+                    props: {
+                        pt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div><MyBadge :pt="badgePt" /></div>',
+                    setup(props) {
+                        const { ptFor } = usePassThrough({
+                            badge: {
+                                // NO $merge here - theme doesn't want to merge with Badge
+                                root: 'border-1 border-pink-500',
+                                wrapper: 'px-10'
+                            }
+                        }, computed(() => props.pt))
+                        return { badgePt: computed(() => ptFor('badge')) }
+                    }
+                })
+
+                // Page says $merge - this should cascade all the way to MyBadge
+                const wrapper = mount(MyInput, {
+                    props: {
+                        pt: {
+                            badge: {
+                                $merge: true,  // Page wants merge - should cascade
+                                root: 'bg-red-500'
+                            }
+                        }
+                    }
+                })
+
+                const badgeRoot = wrapper.find('[data-testid="badge-root"]').element as HTMLElement
+
+                // Solution A: $merge from props cascades to child
+                // So MyBadge should merge: theme + (MyInput badge + Page badge)
+                // = 'text-red-500' + 'border-1 border-pink-500 bg-red-500'
+                expect(badgeRoot.className).toContain('text-red-500')  // MyBadge theme preserved!
+                expect(badgeRoot.className).toContain('border-1')
+                expect(badgeRoot.className).toContain('border-pink-500')
+                expect(badgeRoot.className).toContain('bg-red-500')
+            })
+
+            it('$merge does NOT cascade when props uses $replace', () => {
+                // MyBadge component
+                const MyBadge = defineComponent({
+                    props: {
+                        pt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="badge-root">badge</div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'text-red-500 px-4'
+                        }, computed(() => props.pt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                // MyInput - theme has $merge
+                const MyInput = defineComponent({
+                    components: { MyBadge },
+                    props: {
+                        pt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div><MyBadge :pt="badgePt" /></div>',
+                    setup(props) {
+                        const { ptFor } = usePassThrough({
+                            badge: {
+                                $merge: true,
+                                root: 'border-1'
+                            }
+                        }, computed(() => props.pt))
+                        return { badgePt: computed(() => ptFor('badge')) }
+                    }
+                })
+
+                // Page says $replace - completely override
+                const wrapper = mount(MyInput, {
+                    props: {
+                        pt: {
+                            badge: {
+                                $replace: true,  // Replace everything
+                                root: 'bg-blue-500'
+                            }
+                        }
+                    }
+                })
+
+                const badgeRoot = wrapper.find('[data-testid="badge-root"]').element as HTMLElement
+
+                // $replace means: ignore MyInput's badge, just use Page's
+                // MyBadge receives pt without $merge, so REPLACE strategy
+                expect(badgeRoot.className).toBe('bg-blue-500')
+                expect(badgeRoot.className).not.toContain('text-red-500')  // MyBadge theme ignored
+                expect(badgeRoot.className).not.toContain('border-1')      // MyInput badge ignored
+            })
+        })
     })
 
     // ============================================

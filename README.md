@@ -189,24 +189,50 @@ Works with both `ptMark` (single elements) and `ptFor` (nested components).
 
 #### Multi-Level Merging
 
-When multiple components are nested, `$merge` preserves settings from all levels:
+When multiple components are nested, `$merge` preserves settings from all levels. The override order is:
 
 ```
-Page → MyInput → Badge
-       (theme.badge.wrapper: 'px-10')
+Badge theme → MyInput badge settings → Page pt.badge
+(base)        (middle override)        (final override)
 ```
+
+**Example: 3-level nesting**
 
 ```vue
-<!-- In Page -->
+<!-- Badge (innermost) - theme: { root: 'text-red-500', wrapper: 'px-3 py-2' } -->
+
+<!-- MyInput (middle) - theme includes badge settings -->
+<script setup>
+const { ptFor } = usePassThrough({
+  badge: {
+    $merge: true,                    // Pass $merge flag to Badge
+    root: 'border-1 border-pink-500',
+    wrapper: 'px-10'
+  }
+}, props.pt)
+</script>
+<template>
+  <Badge :pt="ptFor('badge')" />     <!-- Badge receives merged pt -->
+</template>
+
+<!-- Page (outermost) - final override -->
 <MyInput :pt="{
   badge: {
-    $merge: true,              // Merge with MyInput's theme
-    wrapper: 'text-red-500'    // Add to existing wrapper
+    $merge: true,
+    root: 'bg-red-500'              // Add to existing styles
   }
 }" />
 
-<!-- Result: Badge receives { wrapper: 'px-10 text-red-500' } -->
+<!-- Result in Badge:
+  root: 'text-red-500 border-1 border-pink-500 bg-red-500' (all merged)
+  wrapper: 'px-10 py-2' (px-10 wins over px-3 via tailwind-merge)
+-->
 ```
+
+**Key Points:**
+- The `$merge` flag at the pt object's top level applies to ALL keys in that object
+- `$merge` **cascades to children**: If you specify `$merge: true` in props, it automatically passes down through ptFor, so child components also merge with their themes
+- Use `$replace: true` to break the cascade and completely override
 
 #### Flag Conflict
 
