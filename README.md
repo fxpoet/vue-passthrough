@@ -38,7 +38,7 @@ npm install vue-passthrough
 </template>
 
 <script setup lang="ts">
-import { usePassThrough, PtSpec } from 'vue-passthrough'
+import { usePassThrough, type PtSpec } from 'vue-passthrough'
 
 const props = defineProps<{
   pt?: PtSpec
@@ -381,8 +381,7 @@ If key doesn't exist in props.pt → MERGE theme + attrs
 </template>
 
 <script setup lang="ts">
-import { usePassThrough } from 'vue-passthrough'
-import type { PtSpec } from 'vue-passthrough'
+import { usePassThrough, type PtSpec } from 'vue-passthrough'
 
 const props = defineProps<{
   modelValue?: string
@@ -442,8 +441,7 @@ Usage:
 </template>
 
 <script setup lang="ts">
-import { usePassThrough } from 'vue-passthrough'
-import type { PtSpec } from 'vue-passthrough'
+import { usePassThrough, type PtSpec } from 'vue-passthrough'
 
 const props = defineProps<{
   icon?: string
@@ -516,7 +514,7 @@ Main composable function for the PassThrough system with full TypeScript support
 **Parameters:**
 
 - `theme: T extends PtSpec` - Default theme definition
-- `propsPt?: MaybeRef<PtSpec | undefined>` - props.pt (optional, automatically handles ref/computed)
+- `propsPt: MaybeRef<PtSpec | undefined>` - props.pt (automatically handles ref/computed)
 
 **Returns:**
 
