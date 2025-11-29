@@ -8,11 +8,11 @@ Vue composable for deep style customization of nested component elements with Ta
 Main composable for PassThrough system.
 
 ```ts
-const { ptPoint, ptFor, debugPt } = usePassThrough(theme, props.pt)
+const { ptMark, ptFor, debugPt } = usePassThrough(theme, props.pt)
 ```
 
 **Returns:**
-- `ptPoint(key)` - Get HTML attributes for v-bind (type-safe with defineTheme)
+- `ptMark(key)` - Get HTML attributes for v-bind (type-safe with defineTheme)
 - `ptFor(key)` - Extract nested pt for child components
 - `debugPt` - ComputedRef<PtSpec> for debugging
 
@@ -38,14 +38,14 @@ interface PtSpec {
 ### Basic Component
 ```vue
 <template>
-  <div v-bind="ptPoint('root')">
-    <input v-bind="ptPoint('input')" />
+  <div v-bind="ptMark('root')">
+    <input v-bind="ptMark('input')" />
   </div>
 </template>
 
 <script setup>
 const props = defineProps<{ pt?: PtSpec }>()
-const { ptPoint } = usePassThrough({
+const { ptMark } = usePassThrough({
   root: 'grid gap-2',
   input: 'border px-3'
 }, props.pt)
@@ -98,7 +98,7 @@ const { ptPoint } = usePassThrough({
 
 ### Nested Components
 ```ts
-const { ptPoint, ptFor } = usePassThrough({
+const { ptMark, ptFor } = usePassThrough({
   root: 'flex gap-2',
   badge: {           // nested pt for child
     root: 'px-2',

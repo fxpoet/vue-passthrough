@@ -1,11 +1,11 @@
 <template>
-<div v-bind="ptPoint('root')">
-    <label v-if="label" v-bind="ptPoint('label')">
+<div v-bind="ptMark('root')">
+    <label v-if="label" v-bind="ptMark('label')">
         {{ label }}
     </label>
-    <input v-bind="ptPoint('input')" :value="modelValue"
+    <input v-bind="ptMark('input')" :value="modelValue"
         @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)" />
-    <p v-if="helper" v-bind="ptPoint('helper')">
+    <p v-if="helper" v-bind="ptMark('helper')">
         {{ helper }}
     </p>
 </div>
@@ -30,7 +30,7 @@ defineEmits<{
     'update:modelValue': [value: string]
 }>()
 
-const { ptPoint } = usePassThrough({
+const { ptMark } = usePassThrough({
     root: 'flex flex-col gap-2',
     label: 'text-sm font-medium text-gray-700',
     input: {

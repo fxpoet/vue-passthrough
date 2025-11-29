@@ -29,9 +29,9 @@ npm install vue-passthrough
 
 ```vue
 <template>
-  <div v-bind="ptPoint('root')">
-    <input v-bind="ptPoint('input')" />
-    <div v-bind="ptPoint('helper')">
+  <div v-bind="ptMark('root')">
+    <input v-bind="ptMark('input')" />
+    <div v-bind="ptMark('helper')">
       <slot />
     </div>
   </div>
@@ -51,7 +51,7 @@ let theme = {
   helper: 'text-xs text-gray-500'
 }
 
-const { ptPoint } = usePassThrough(theme, props.pt)
+const { ptMark } = usePassThrough(theme, props.pt)
 </script>
 ```
 
@@ -87,7 +87,7 @@ Reuse styles by inheriting from existing definitions.
 
 ```vue
 <script setup lang="ts">
-const { ptPoint } = usePassThrough({
+const { ptMark } = usePassThrough({
   input: 'w-full rounded-xl border px-3 py-2',
   inputInvalid: { // Inherit from input and add additional styles
     extend: 'input',
@@ -97,7 +97,7 @@ const { ptPoint } = usePassThrough({
 </script>
 
 <template>
-  <input v-bind="ptPoint(props.invalid ? 'inputInvalid' : 'input')" />
+  <input v-bind="ptMark(props.invalid ? 'inputInvalid' : 'input')" />
 </template>
 ```
 
@@ -107,7 +107,7 @@ Pass pt specifications to nested components.
 
 ```vue
 <script setup lang="ts">
-const { ptPoint, ptFor } = usePassThrough({
+const { ptMark, ptFor } = usePassThrough({
   root: 'flex items-center gap-2',
   badge: { // badge is a nested object (no class property)
     root: 'px-2 py-1 rounded',
@@ -118,7 +118,7 @@ const { ptPoint, ptFor } = usePassThrough({
 </script>
 
 <template>
-  <div v-bind="ptPoint('root')">
+  <div v-bind="ptMark('root')">
     <!-- Pass badge pt to child component -->
     <Badge :pt="ptFor('badge')" />
   </div>
@@ -241,22 +241,22 @@ If key doesn't exist in props.pt → MERGE theme + attrs
 
 ```vue
 <template>
-  <div v-bind="ptPoint('root')">
-    <label v-bind="ptPoint('label')">
+  <div v-bind="ptMark('root')">
+    <label v-bind="ptMark('label')">
       {{ label }}
     </label>
 
     <input
       v-model="modelValue"
       :placeholder="placeholder"
-      v-bind="ptPoint(error ? 'inputError' : 'input')"
+      v-bind="ptMark(error ? 'inputError' : 'input')"
     />
 
-    <p v-if="error" v-bind="ptPoint('errorMessage')">
+    <p v-if="error" v-bind="ptMark('errorMessage')">
       {{ error }}
     </p>
 
-    <div v-bind="ptPoint('helper')">
+    <div v-bind="ptMark('helper')">
       <slot />
     </div>
   </div>
@@ -274,7 +274,7 @@ const props = defineProps<{
   pt?: PtSpec
 }>()
 
-const { ptPoint } = usePassThrough({
+const { ptMark } = usePassThrough({
   root: 'grid gap-2',
   label: 'text-sm font-medium text-gray-700',
   input: 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500',
@@ -310,10 +310,10 @@ Usage:
 
 ```vue
 <template>
-  <button v-bind="ptPoint('root')">
-    <Icon v-if="icon" :name="icon" v-bind="ptPoint('icon')" />
+  <button v-bind="ptMark('root')">
+    <Icon v-if="icon" :name="icon" v-bind="ptMark('icon')" />
 
-    <span v-bind="ptPoint('label')">
+    <span v-bind="ptMark('label')">
       <slot />
     </span>
 
@@ -334,7 +334,7 @@ const props = defineProps<{
   pt?: PtSpec
 }>()
 
-const { ptPoint, ptFor } = usePassThrough({
+const { ptMark, ptFor } = usePassThrough({
   root: props.variant === 'primary'
     ? 'px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600'
     : 'px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300',
@@ -404,7 +404,7 @@ Main composable function for the PassThrough system with full TypeScript support
 
 ```typescript
 {
-  ptPoint: (key: ThemeKeys<T>) => Record<string, any>,  // Type-safe keys with autocomplete
+  ptMark: (key: ThemeKeys<T>) => Record<string, any>,  // Type-safe keys with autocomplete
   ptFor: (key: ThemeKeys<T>) => PtSpec,                 // Type-safe keys with autocomplete
   debugPt: ComputedRef<PtSpec>
 }
@@ -416,7 +416,7 @@ Main composable function for the PassThrough system with full TypeScript support
 <script setup lang="ts">
 import { usePassThrough } from 'vue-passthrough'
 
-const { ptPoint } = usePassThrough({
+const { ptMark } = usePassThrough({
   root: 'grid gap-2',
   input: 'border px-3'
 }, props.pt)
@@ -439,14 +439,14 @@ const theme = defineTheme({
 const props = defineProps<{ pt?: PtSpec }>()
 
 // TypeScript infers theme keys automatically
-const { ptPoint } = usePassThrough(theme, props.pt)
+const { ptMark } = usePassThrough(theme, props.pt)
 </script>
 
 <template>
-  <div v-bind="ptPoint('root')">
-    <input v-bind="ptPoint('input')" />
-    <!-- ptPoint('root'), ptPoint('input'), ptPoint('helper') have autocomplete ✅ -->
-    <!-- ptPoint('invalid') will show TypeScript error ❌ -->
+  <div v-bind="ptMark('root')">
+    <input v-bind="ptMark('input')" />
+    <!-- ptMark('root'), ptMark('input'), ptMark('helper') have autocomplete ✅ -->
+    <!-- ptMark('invalid') will show TypeScript error ❌ -->
   </div>
 </template>
 ```
@@ -477,7 +477,7 @@ const myTheme = defineTheme({
   }
 })
 
-const { ptPoint, ptFor } = usePassThrough(myTheme, props.pt)
+const { ptMark, ptFor } = usePassThrough(myTheme, props.pt)
 // Now you get autocomplete for all theme keys!
 ```
 
