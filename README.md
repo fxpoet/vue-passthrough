@@ -131,6 +131,98 @@ Usage:
 <MyButton :pt="{ badge: { label: 'text-red-500', icon: 'w-6 h-6' } }" />
 ```
 
+### $merge and $replace Flags
+
+By default, `:pt` props use **REPLACE** strategy - the theme is ignored for that key. Use `$merge: true` to merge with the theme instead, or `$replace: true` to explicitly indicate replacement.
+
+Works with both `ptMark` (single elements) and `ptFor` (nested components).
+
+#### For Single Elements (ptMark)
+
+```vue
+<!-- theme: { root: 'grid gap-2', input: 'border px-3' } -->
+
+<!-- REPLACE (default) - theme.root is ignored -->
+<MyInput :pt="{ root: 'flex gap-4' }" />
+<!-- Result: root = 'flex gap-4' -->
+
+<!-- REPLACE (explicit) - same as default, but clearer intent -->
+<MyInput :pt="{ root: { $replace: true, class: 'flex gap-4' } }" />
+<!-- Result: root = 'flex gap-4' -->
+
+<!-- MERGE - theme.root is preserved and merged -->
+<MyInput :pt="{ root: { $merge: true, class: 'bg-red-500' } }" />
+<!-- Result: root = 'grid gap-2 bg-red-500' -->
+```
+
+#### For Nested Components (ptFor)
+
+```vue
+<!-- MyButton theme: { badge: { root: 'px-2 py-1', label: 'text-xs' } } -->
+
+<!-- REPLACE (default) - theme.badge is completely ignored -->
+<MyButton :pt="{
+  badge: {
+    label: 'text-red-500'
+  }
+}" />
+<!-- Result: badge only has { label: 'text-red-500' } -->
+
+<!-- REPLACE (explicit) - clearer intent -->
+<MyButton :pt="{
+  badge: {
+    $replace: true,
+    label: 'text-red-500'
+  }
+}" />
+<!-- Result: badge only has { label: 'text-red-500' } -->
+
+<!-- MERGE - theme.badge is preserved and merged -->
+<MyButton :pt="{
+  badge: {
+    $merge: true,
+    label: 'text-red-500'
+  }
+}" />
+<!-- Result: badge has { root: 'px-2 py-1', label: 'text-xs text-red-500' } -->
+```
+
+#### Multi-Level Merging
+
+When multiple components are nested, `$merge` preserves settings from all levels:
+
+```
+Page → MyInput → Badge
+       (theme.badge.wrapper: 'px-10')
+```
+
+```vue
+<!-- In Page -->
+<MyInput :pt="{
+  badge: {
+    $merge: true,              // Merge with MyInput's theme
+    wrapper: 'text-red-500'    // Add to existing wrapper
+  }
+}" />
+
+<!-- Result: Badge receives { wrapper: 'px-10 text-red-500' } -->
+```
+
+#### Flag Conflict
+
+If both `$merge` and `$replace` are set, a warning is logged and `$merge` takes priority:
+
+```vue
+<!-- Warning: Both $merge and $replace are set. Using $merge. -->
+<MyInput :pt="{ root: { $merge: true, $replace: true, class: 'bg-red' } }" />
+```
+
+| Flag | Strategy | Use Case |
+|------|----------|----------|
+| (none) | REPLACE | Complete override (implicit) |
+| `$replace: true` | REPLACE | Complete override (explicit intent) |
+| `$merge: true` | MERGE | Partial adjustment while preserving theme defaults |
+
 ## Merge Strategy: Replace vs Merge
 
 The PassThrough system **automatically** chooses replace/merge based on how you pass the pt.
@@ -485,10 +577,13 @@ const { ptMark, ptFor } = usePassThrough(myTheme, props.pt)
 
 ```typescript
 interface PtSpec {
+  $merge?: boolean              // When true, merges with theme instead of replacing
+  $replace?: boolean            // When true, explicitly replaces theme (default behavior)
   [key: string]:
     | string                    // class shorthand
-    | Record<string, any>        // HTML attributes object
-    | PtSpec                     // nested pt (for child components)
+    | Record<string, any>       // HTML attributes object
+    | PtSpec                    // nested pt (for child components)
+    | boolean                   // for $merge/$replace flags
     | undefined
 }
 ```
@@ -509,6 +604,40 @@ type MyThemeKeys = ThemeKeys<typeof theme> // 'root' | 'input' | 'helper'
 function customFunction(key: MyThemeKeys) {
   // key is now type-safe
 }
+```
+
+## Common Mistakes
+
+### 1. Using `:v-bind` instead of `v-bind`
+
+```vue
+<!-- ❌ Wrong - :v-bind is invalid syntax -->
+<div :v-bind="ptMark('root')">
+
+<!-- ✅ Correct - v-bind without colon -->
+<div v-bind="ptMark('root')">
+```
+
+### 2. Using `v-bind` with `ptFor` instead of `:pt`
+
+```vue
+<!-- ❌ Wrong - ptFor returns PtSpec, not HTML attributes -->
+<Badge v-bind="ptFor('badge')" />
+
+<!-- ✅ Correct - pass ptFor result to :pt prop -->
+<Badge :pt="ptFor('badge')" />
+```
+
+### 3. Omitting `props.pt` in `usePassThrough`
+
+```vue
+<script setup lang="ts">
+// ❌ Wrong - missing props.pt causes warning
+const { ptMark } = usePassThrough(theme)
+
+// ✅ Correct - always pass props.pt
+const { ptMark } = usePassThrough(theme, props.pt)
+</script>
 ```
 
 ## Requirements

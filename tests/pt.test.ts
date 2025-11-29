@@ -424,7 +424,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: { class: 'border', onClick: themeHandler }
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -448,7 +448,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: 'px-2 py-4 bg-red-500'
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -515,7 +515,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: 'grid gap-2'
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -538,7 +538,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: 'grid'
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -563,7 +563,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: 'cursor-pointer'
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -586,7 +586,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: 'grid gap-2'
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -627,7 +627,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: 'grid gap-2'
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -726,7 +726,7 @@ describe('PassThrough System', () => {
                 setup() {
                     const { ptMark } = usePassThrough({
                         root: 'grid gap-2'
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -753,7 +753,7 @@ describe('PassThrough System', () => {
                             extend: 'input',
                             class: 'border-red-500'
                         }
-                    })
+                    }, ref({}))
                     return { ptMark }
                 }
             })
@@ -912,7 +912,7 @@ describe('PassThrough System', () => {
                     usePassThrough({
                         a: { extend: 'b', class: 'a-class' },
                         b: { extend: 'a', class: 'b-class' }
-                    })
+                    }, ref({}))
                 }
             })
 
@@ -936,7 +936,7 @@ describe('PassThrough System', () => {
                             extend: 'nonExistent',
                             class: 'border-red-500'
                         }
-                    })
+                    }, ref({}))
                 }
             })
 
@@ -959,7 +959,7 @@ describe('PassThrough System', () => {
                             label: 'text-xs',
                             icon: 'w-4'
                         }
-                    })
+                    }, ref({}))
 
                     const badgePt = ptFor('badge')
 
@@ -982,7 +982,7 @@ describe('PassThrough System', () => {
             const TestComponent1 = defineComponent({
                 template: '<div>test1</div>',
                 setup() {
-                    usePassThrough(theme)
+                    usePassThrough(theme, ref({}))
                 }
             })
 
@@ -992,7 +992,7 @@ describe('PassThrough System', () => {
             const TestComponent2 = defineComponent({
                 template: '<div>test2</div>',
                 setup() {
-                    usePassThrough(theme)
+                    usePassThrough(theme, ref({}))
                 }
             })
 
@@ -1000,6 +1000,409 @@ describe('PassThrough System', () => {
 
             // When cache works, processTheme is executed only once
             // Verify WeakMap cache works correctly (performance test)
+        })
+    })
+
+    // ============================================
+    // $merge and $replace flags tests
+    // ============================================
+    describe('$merge and $replace flags', () => {
+        describe('ptMark with $merge', () => {
+            it('$merge: true merges with theme instead of replacing', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="root">test</div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'grid gap-2 text-sm'
+                        }, computed(() => props.customPt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                const wrapper = mount(TestComponent, {
+                    props: {
+                        customPt: { root: { $merge: true, class: 'bg-red-500' } }
+                    }
+                })
+
+                const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+                // Should merge: theme + props.pt
+                expect(rootEl.className).toContain('grid')
+                expect(rootEl.className).toContain('gap-2')
+                expect(rootEl.className).toContain('text-sm')
+                expect(rootEl.className).toContain('bg-red-500')
+            })
+
+            it('$merge: true with conflicting classes uses tailwind-merge', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="root">test</div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'text-sm text-red-500'
+                        }, computed(() => props.customPt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                const wrapper = mount(TestComponent, {
+                    props: {
+                        customPt: { root: { $merge: true, class: 'text-lg text-blue-500' } }
+                    }
+                })
+
+                const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+                // tailwind-merge should resolve conflicts
+                expect(rootEl.className).toContain('text-lg')
+                expect(rootEl.className).not.toContain('text-sm')
+                expect(rootEl.className).toContain('text-blue-500')
+                expect(rootEl.className).not.toContain('text-red-500')
+            })
+        })
+
+        describe('ptMark with $replace', () => {
+            it('$replace: true explicitly replaces theme (same as default)', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="root">test</div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'grid gap-2'
+                        }, computed(() => props.customPt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                const wrapper = mount(TestComponent, {
+                    props: {
+                        customPt: { root: { $replace: true, class: 'flex flex-row' } }
+                    }
+                })
+
+                const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+                // Should replace completely
+                expect(rootEl.className).toBe('flex flex-row')
+                expect(rootEl.className).not.toContain('grid')
+            })
+
+            it('$replace removes the flag from output', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="root">test</div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'grid'
+                        }, computed(() => props.customPt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                const wrapper = mount(TestComponent, {
+                    props: {
+                        customPt: { root: { $replace: true, class: 'flex', id: 'test-id' } }
+                    }
+                })
+
+                const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+                expect(rootEl.className).toBe('flex')
+                expect(rootEl.id).toBe('test-id')
+                // $replace should not appear as an attribute
+                expect(rootEl.getAttribute('$replace')).toBeNull()
+            })
+        })
+
+        describe('ptMark with both $merge and $replace', () => {
+            it('warns when both flags are set and uses $merge', () => {
+                const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div v-bind="ptFunc(\'root\')" data-testid="root">test</div>',
+                    setup(props) {
+                        const { ptMark } = usePassThrough({
+                            root: 'grid gap-2'
+                        }, computed(() => props.customPt))
+                        return { ptFunc: ptMark }
+                    }
+                })
+
+                const wrapper = mount(TestComponent, {
+                    props: {
+                        customPt: { root: { $merge: true, $replace: true, class: 'bg-red-500' } }
+                    }
+                })
+
+                // Should warn
+                expect(consoleWarnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Both $merge and $replace are set')
+                )
+
+                // Should use $merge (merge with theme)
+                const rootEl = wrapper.find('[data-testid="root"]').element as HTMLElement
+                expect(rootEl.className).toContain('grid')
+                expect(rootEl.className).toContain('bg-red-500')
+
+                consoleWarnSpy.mockRestore()
+            })
+        })
+
+        describe('ptFor with $merge', () => {
+            it('$merge: true merges nested pt with theme', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div>test</div>',
+                    setup(props) {
+                        const { ptFor } = usePassThrough({
+                            badge: {
+                                root: 'px-2 py-1',
+                                label: 'text-xs'
+                            }
+                        }, computed(() => props.customPt))
+
+                        const badgePt = ptFor('badge')
+
+                        // Should merge: theme.badge + props.pt.badge
+                        expect(badgePt).toHaveProperty('root')
+                        expect(badgePt).toHaveProperty('label')
+                        expect(badgePt).toHaveProperty('icon')
+                        expect((badgePt as any).root).toBe('px-2 py-1')
+                        expect((badgePt as any).icon).toBe('w-4 h-4')
+                    }
+                })
+
+                mount(TestComponent, {
+                    props: {
+                        customPt: {
+                            badge: {
+                                $merge: true,
+                                icon: 'w-4 h-4'
+                            }
+                        }
+                    }
+                })
+            })
+
+            it('$merge: true preserves theme values not specified in props.pt', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div>test</div>',
+                    setup(props) {
+                        const { ptFor } = usePassThrough({
+                            badge: {
+                                root: 'px-2 py-1',
+                                label: 'text-xs',
+                                icon: 'w-4 h-4'
+                            }
+                        }, computed(() => props.customPt))
+
+                        const badgePt = ptFor('badge')
+
+                        // Theme values should be preserved
+                        expect((badgePt as any).root).toBe('px-2 py-1')
+                        expect((badgePt as any).icon).toBe('w-4 h-4')
+                        // label should be merged (twMerge applied)
+                        expect((badgePt as any).label).toHaveProperty('class')
+                    }
+                })
+
+                mount(TestComponent, {
+                    props: {
+                        customPt: {
+                            badge: {
+                                $merge: true,
+                                label: 'text-red-500'  // Only override label
+                            }
+                        }
+                    }
+                })
+            })
+        })
+
+        describe('ptFor with $replace', () => {
+            it('$replace: true explicitly replaces (same as default)', () => {
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div>test</div>',
+                    setup(props) {
+                        const { ptFor } = usePassThrough({
+                            badge: {
+                                root: 'px-2 py-1',
+                                label: 'text-xs'
+                            }
+                        }, computed(() => props.customPt))
+
+                        const badgePt = ptFor('badge')
+
+                        // Should replace: only props.pt.badge values
+                        expect(badgePt).toHaveProperty('icon')
+                        expect(badgePt).not.toHaveProperty('root')
+                        expect(badgePt).not.toHaveProperty('label')
+                    }
+                })
+
+                mount(TestComponent, {
+                    props: {
+                        customPt: {
+                            badge: {
+                                $replace: true,
+                                icon: 'w-6 h-6'
+                            }
+                        }
+                    }
+                })
+            })
+        })
+
+        describe('ptFor with both $merge and $replace', () => {
+            it('warns when both flags are set and uses $merge', () => {
+                const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+
+                const TestComponent = defineComponent({
+                    props: {
+                        customPt: {
+                            type: Object as () => PtSpec,
+                            default: () => ({})
+                        }
+                    },
+                    template: '<div>test</div>',
+                    setup(props) {
+                        const { ptFor } = usePassThrough({
+                            badge: {
+                                root: 'px-2',
+                                label: 'text-xs'
+                            }
+                        }, computed(() => props.customPt))
+
+                        ptFor('badge')  // Trigger the warning
+                    }
+                })
+
+                mount(TestComponent, {
+                    props: {
+                        customPt: {
+                            badge: {
+                                $merge: true,
+                                $replace: true,
+                                icon: 'w-4'
+                            }
+                        }
+                    }
+                })
+
+                expect(consoleWarnSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Both $merge and $replace are set')
+                )
+
+                consoleWarnSpy.mockRestore()
+            })
+        })
+    })
+
+    // ============================================
+    // propsPt required warning tests
+    // ============================================
+    describe('propsPt required warning', () => {
+        it('warns when propsPt is omitted', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    // @ts-expect-error - intentionally omitting propsPt
+                    usePassThrough({ root: 'grid' })
+                }
+            })
+
+            mount(TestComponent)
+
+            expect(consoleWarnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('propsPt (props.pt) is required')
+            )
+
+            consoleWarnSpy.mockRestore()
+        })
+
+        it('warns when propsPt is explicitly undefined (use ref or props.pt instead)', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    // Passing explicit undefined still warns - use ref(undefined) or props.pt instead
+                    usePassThrough({ root: 'grid' }, undefined)
+                }
+            })
+
+            mount(TestComponent)
+
+            // Should still warn because explicit undefined is same as omitted at runtime
+            // Developers should use ref(undefined) or props.pt instead
+            expect(consoleWarnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('propsPt (props.pt) is required')
+            )
+
+            consoleWarnSpy.mockRestore()
+        })
+
+        it('does not warn when propsPt is a ref', () => {
+            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
+
+            const TestComponent = defineComponent({
+                template: '<div>test</div>',
+                setup() {
+                    const pt = ref<PtSpec | undefined>(undefined)
+                    usePassThrough({ root: 'grid' }, pt)
+                }
+            })
+
+            mount(TestComponent)
+
+            expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+                expect.stringContaining('propsPt (props.pt) is required')
+            )
+
+            consoleWarnSpy.mockRestore()
         })
     })
 })

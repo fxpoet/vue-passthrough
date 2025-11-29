@@ -29,7 +29,9 @@ const theme = defineTheme({
 ### PtSpec Type
 ```ts
 interface PtSpec {
-  [key: string]: string | Record<string, any> | PtSpec | undefined
+  $merge?: boolean   // When true, merges with theme instead of replacing
+  $replace?: boolean // When true, explicitly replaces theme (default behavior)
+  [key: string]: string | Record<string, any> | PtSpec | boolean | undefined
 }
 ```
 
@@ -96,7 +98,7 @@ const { ptMark } = usePassThrough({
 // inputError inherits from input
 ```
 
-### Nested Components
+### Nested Components (ptFor)
 ```ts
 const { ptMark, ptFor } = usePassThrough({
   root: 'flex gap-2',
@@ -111,11 +113,31 @@ const { ptMark, ptFor } = usePassThrough({
 <Badge :pt="ptFor('badge')" />
 ```
 
+### $merge and $replace Flags
+By default, `:pt` props use REPLACE strategy. Use flags for explicit control:
+- `$merge: true` - merge with theme
+- `$replace: true` - explicitly replace (same as default, clearer intent)
+- Both set: warns and uses `$merge`
+
+```vue
+<!-- Single element (ptMark) -->
+<MyInput :pt="{ root: 'flex' }" />                              <!-- REPLACE (implicit) -->
+<MyInput :pt="{ root: { $replace: true, class: 'flex' } }" />   <!-- REPLACE (explicit) -->
+<MyInput :pt="{ root: { $merge: true, class: 'bg-red' } }" />   <!-- MERGE -->
+
+<!-- Nested component (ptFor) -->
+<MyButton :pt="{ badge: { label: 'text-red' } }" />                     <!-- REPLACE -->
+<MyButton :pt="{ badge: { $replace: true, label: 'text-red' } }" />     <!-- REPLACE (explicit) -->
+<MyButton :pt="{ badge: { $merge: true, label: 'text-red' } }" />       <!-- MERGE -->
+```
+
 ## Key Points for LLMs
 
 1. **Strings are class shortcuts**: `root: "grid"` → `root: { class: "grid" }`
 2. **tailwind-merge**: Automatic Tailwind class conflict resolution
 3. **mergeProps**: Event handlers chain, don't override
 4. **Replace vs Merge**: `:pt` props replace, `pt:*` attrs merge
-5. **Type safety**: Use `defineTheme` for autocomplete
-6. **Reactivity**: propsPt accepts ref/computed
+5. **$merge/$replace flags**: Use `$merge: true` to merge, `$replace: true` for explicit replace. If both set, `$merge` wins with warning
+6. **Type safety**: Use `defineTheme` for autocomplete
+7. **Reactivity**: propsPt accepts ref/computed
+8. **propsPt required**: Always pass props.pt to usePassThrough, even if undefined

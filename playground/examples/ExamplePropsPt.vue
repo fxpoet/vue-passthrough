@@ -12,7 +12,11 @@
         root: 'flex flex-col gap-3',
         label: 'text-base font-bold text-purple-700',
         input: 'px-4 py-3 border-2 border-purple-500 rounded-lg focus:ring-purple-500 bg-purple-50',
-        helper: 'text-sm text-purple-600 font-medium'
+        helper: 'text-sm text-purple-600 font-medium',
+        badge: {
+          $merge: true,
+          wrapper: 'text-lg text-red-500'
+        }
       }"
     />
 

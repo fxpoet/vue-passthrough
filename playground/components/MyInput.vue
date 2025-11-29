@@ -7,12 +7,14 @@
         @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)" />
     <p v-if="helper" v-bind="ptMark('helper')">
         {{ helper }}
+        <Badge label="tag" :pt="ptFor('badge')" />
     </p>
 </div>
 </template>
 
 <script setup lang="ts">
 import { usePassThrough, type PtSpec } from 'vue-passthrough'
+import Badge from './MyBedge.vue'
 
 interface Props {
     label?: string
@@ -30,7 +32,7 @@ defineEmits<{
     'update:modelValue': [value: string]
 }>()
 
-const { ptMark } = usePassThrough({
+const { ptMark, ptFor } = usePassThrough({
     root: 'flex flex-col gap-2',
     label: 'text-sm font-medium text-gray-700',
     input: {
@@ -40,6 +42,10 @@ const { ptMark } = usePassThrough({
         extend: 'input',
         class: 'border-red-500 focus:ring-red-500'
     },
-    helper: 'text-xs text-gray-500'
+    helper: 'text-xs text-gray-500',
+    badge: {
+        $merge: true,
+        wrapper: 'px-10'
+    }
 }, props.pt)
 </script>
