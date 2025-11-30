@@ -20,3 +20,5 @@ package-lock.json
 # Other
 node_modules/
 *.log
+
+DEV.md

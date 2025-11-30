@@ -24,3 +24,5 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+DEV.md
