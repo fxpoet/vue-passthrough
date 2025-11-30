@@ -527,13 +527,6 @@ export function usePassThrough<T extends PtSpec = PtSpec>(
     theme: T,
     propsPt: MaybeRef<PtSpec | undefined>
 ) {
-    // Warn if propsPt is not provided
-    if (propsPt === undefined) {
-        warn('usePassThrough: propsPt (props.pt) is required. Pass props.pt even if it may be undefined.', {
-            hint: 'Usage: usePassThrough(theme, props.pt)'
-        });
-    }
-
     // 1. Extract pt from attrs (maintain reactivity with computed)
     //    Example: pt:root="bg-red-500" → { root: { class: "bg-red-500" } }
     const attrsPt = computed(() => attrsToPt());

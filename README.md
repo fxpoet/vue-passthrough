@@ -612,18 +612,6 @@ type MyThemeKeys = ThemeKeys<typeof theme> // 'root' | 'input' | 'helper'
 <Badge :pt="ptFor('badge')" />
 ```
 
-### 3. Omitting `props.pt` in `usePassThrough`
-
-```vue
-<script setup lang="ts">
-// ❌ Wrong - missing props.pt causes warning
-const { ptMark } = usePassThrough(theme)
-
-// ✅ Correct - always pass props.pt
-const { ptMark } = usePassThrough(theme, props.pt)
-</script>
-```
-
 ## Tailwind CSS v4 Tree-Shaking Issue
 
 When using vue-passthrough with Tailwind CSS, classes defined in `<script setup>` (like in theme objects) may not be detected by Tailwind's content scanner, causing them to be tree-shaken from the final CSS.

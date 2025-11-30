@@ -760,42 +760,4 @@ describe('PassThrough System', () => {
         })
     })
 
-    // ============================================
-    // propsPt required warning tests
-    // ============================================
-    describe('propsPt required warning', () => {
-        it('warns when propsPt is omitted', () => {
-            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
-            const TestComponent = defineComponent({
-                template: '<div>test</div>',
-                // @ts-expect-error - intentionally omitting propsPt
-                setup: () => { usePassThrough({ root: 'grid' }) }
-            })
-            mount(TestComponent)
-            expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('propsPt (props.pt) is required'))
-            consoleWarnSpy.mockRestore()
-        })
-
-        it('warns when propsPt is explicitly undefined', () => {
-            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
-            const TestComponent = defineComponent({
-                template: '<div>test</div>',
-                setup: () => { usePassThrough({ root: 'grid' }, undefined) }
-            })
-            mount(TestComponent)
-            expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('propsPt (props.pt) is required'))
-            consoleWarnSpy.mockRestore()
-        })
-
-        it('does not warn when propsPt is a ref', () => {
-            const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
-            const TestComponent = defineComponent({
-                template: '<div>test</div>',
-                setup: () => { usePassThrough({ root: 'grid' }, ref<PtSpec | undefined>(undefined)) }
-            })
-            mount(TestComponent)
-            expect(consoleWarnSpy).not.toHaveBeenCalledWith(expect.stringContaining('propsPt (props.pt) is required'))
-            consoleWarnSpy.mockRestore()
-        })
-    })
 })
